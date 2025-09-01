@@ -46,8 +46,9 @@ export default function RetroGeometry({ isSlow = false }: Props) {
         mouseY = p.mouseY;
         mouseInCanvas = true;
       };
-      p.mouseEntered = () => { mouseInCanvas = true; };
-      p.mouseExited = () => { mouseInCanvas = false; };
+      // Use mouseOver and mouseOut events instead of mouseEntered/mouseExited
+      p.mouseOver = () => { mouseInCanvas = true; };
+      p.mouseOut = () => { mouseInCanvas = false; };
 
       p.windowResized = () => {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
