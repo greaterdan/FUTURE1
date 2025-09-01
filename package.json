@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "git lfs install && git lfs pull || echo 'LFS pull failed, continuing with build' && next build",
+    "build": "git lfs install && git lfs pull || echo 'LFS pull failed, continuing with build' && node scripts/check-videos.js && npm run build:next",
+    "build:next": "next build",
     "start": "next start",
     "lint": "next lint"
   },
