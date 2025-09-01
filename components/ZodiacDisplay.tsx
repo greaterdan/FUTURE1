@@ -57,16 +57,16 @@ export default function ZodiacDisplay({ zodiacSign, onComplete }: ZodiacDisplayP
           {zodiacSign}
         </h2>
         
-        <div 
-          className="w-96 h-96 mx-auto rounded-lg flex items-center justify-center"
-          style={{ 
-            backgroundColor: getZodiacColor(zodiacSign),
-            animation: 'pulse 2s infinite'
-          }}
-        >
-          <div className="text-6xl text-white font-bold" style={{ fontFamily: 'VT323, monospace' }}>
-            {zodiacSign.charAt(0).toUpperCase()}
-          </div>
+        <div className="w-96 h-96 mx-auto">
+          <video
+            src={getZodiacVideo(zodiacSign)}
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="w-full h-full object-cover rounded-lg"
+            onError={(e) => console.error(`Zodiac video failed to load: ${zodiacSign}`, e)}
+          />
         </div>
         
         <p className="text-xl text-white/80" style={{ fontFamily: 'VT323, monospace' }}>
