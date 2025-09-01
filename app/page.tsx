@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 // Dynamically import all components to avoid SSR issues
 const BackgroundVideo = dynamic(() => import("@/components/BackgroundVideo"), { ssr: false });
@@ -19,6 +19,21 @@ export default function Page() {
   const [showMainPage, setShowMainPage] = useState(false);
   const [isNavigationHubOpen, setIsNavigationHubOpen] = useState(false);
   const [isScopeOpen, setIsScopeOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Check localStorage on component mount
+  useEffect(() => {
+    const savedBirthday = localStorage.getItem('userBirthday');
+    const savedZodiacSign = localStorage.getItem('zodiacSign');
+    
+    if (savedBirthday && savedZodiacSign) {
+      setUserBirthday(new Date(savedBirthday));
+      setZodiacSign(savedZodiacSign);
+      setShowMainPage(true);
+    }
+    
+    setIsLoading(false);
+  }, []);
 
   const handleBirthdaySubmit = (birthday: Date) => {
     setUserBirthday(birthday);
@@ -42,13 +57,24 @@ export default function Page() {
     else sign = "pisces";
     
     setZodiacSign(sign);
+    
+    // Save to localStorage
+    localStorage.setItem('userBirthday', birthday.toISOString());
+    localStorage.setItem('zodiacSign', sign);
   };
 
   const handleZodiacComplete = () => {
     setShowMainPage(true);
   };
 
-  // Show birthday entry first
+  // Show loading state while checking localStorage
+  if (isLoading) {
+    return <div className="fixed inset-0 bg-black flex items-center justify-center">
+      <div className="text-white text-xl">Loading...</div>
+    </div>;
+  }
+
+  // Show birthday entry first (only if no saved data)
   if (!userBirthday) {
     return <BirthdayEntry onBirthdaySubmit={handleBirthdaySubmit} />;
   }

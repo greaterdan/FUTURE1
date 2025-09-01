@@ -10,7 +10,7 @@ export default function BackgroundVideo({ isSlow = false }: Props) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoaded(true);
-    }, 1000);
+    }, 200);
     return () => clearTimeout(timer);
   }, []);
 
@@ -34,7 +34,7 @@ export default function BackgroundVideo({ isSlow = false }: Props) {
         opacity: isLoaded ? 1 : 0,
         objectFit: 'cover'
       }}
-      src="https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"
+      src="/Space_Time_Travel__Seamless_VJ_Loop_uhd_2533132.mp4"
       autoPlay
       muted
       loop

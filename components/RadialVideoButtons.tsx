@@ -19,10 +19,10 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
   const animationRef = useRef<number | undefined>(undefined);
 
   const BUTTONS = [
-    { pos: "top",    color: "#FF6B6B", alt: "Top",    onClick: () => setIsNavigationHubOpen(true) },
-    { pos: "right",  color: "#4ECDC4", alt: "Right",  onClick: () => console.log("Right") },
-    { pos: "bottom", color: "#45B7D1", alt: "Bottom", onClick: () => setIsScopeOpen(true) },
-    { pos: "left",   color: "#96CEB4", alt: "Left",   onClick: () => console.log("Left") },
+    { pos: "top",    color: "#FF6B6B", alt: "Top",    onClick: () => setIsNavigationHubOpen(true), video: "/1.webm" },
+    { pos: "right",  color: "#4ECDC4", alt: "Right",  onClick: () => console.log("Right"), video: "/2.webm" },
+    { pos: "bottom", color: "#45B7D1", alt: "Bottom", onClick: () => setIsScopeOpen(true), video: "/3.webm" },
+    { pos: "left",   color: "#96CEB4", alt: "Left",   onClick: () => console.log("Left"), video: "/4.webm" },
   ];
 
   // Removed video loading effect since we're using colored buttons now
@@ -108,13 +108,19 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
               onMouseLeave={() => setHoveredButton(null)}
             >
               <div 
-                className="w-full h-full rounded-full flex items-center justify-center text-white font-bold text-lg"
+                className="w-full h-full rounded-full overflow-hidden"
                 style={{ 
-                  backgroundColor: BUTTONS[index].color,
                   animation: 'pulse 2s infinite'
                 }}
               >
-                {BUTTONS[index].pos.charAt(0).toUpperCase()}
+                <video
+                  src={BUTTONS[index].video}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
               </div>
             </div>
           ))}

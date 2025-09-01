@@ -26,24 +26,24 @@ export default function ZodiacDisplay({ zodiacSign, onComplete }: ZodiacDisplayP
     };
   }, [onComplete]);
 
-  const getZodiacColor = (sign: string): string => {
-    // Map zodiac signs to colors
-    const zodiacColors: { [key: string]: string } = {
-      aries: "#FF6B6B",
-      taurus: "#4ECDC4", 
-      gemini: "#45B7D1",
-      cancer: "#96CEB4",
-      leo: "#FFEAA7",
-      virgo: "#DDA0DD",
-      libra: "#98D8C8",
-      scorpio: "#F7DC6F",
-      sagittarius: "#BB8FCE",
-      capricorn: "#85C1E9",
-      aquarius: "#F8C471",
-      pisces: "#82E0AA"
+  const getZodiacVideo = (sign: string): string => {
+    // Map zodiac signs to .webm files (all converted for web compatibility)
+    const zodiacVideos: { [key: string]: string } = {
+      aries: "/zodiac/aries.webm",
+      taurus: "/zodiac/taurus.webm",
+      gemini: "/zodiac/gemini.webm",
+      cancer: "/zodiac/cancer.webm",
+      leo: "/zodiac/leo.webm",
+      virgo: "/zodiac/virgo.webm",
+      libra: "/zodiac/libra.webm",
+      scorpio: "/zodiac/scorpio.webm",
+      sagittarius: "/zodiac/sagittarius.webm",
+      capricorn: "/zodiac/capricorn.webm",
+      aquarius: "/zodiac/aquarius.webm",
+      pisces: "/zodiac/pisces.webm"
     };
     
-    return zodiacColors[sign] || "#FF6B6B";
+    return zodiacVideos[sign] || "/zodiac/aries.webm";
   };
 
   return (
