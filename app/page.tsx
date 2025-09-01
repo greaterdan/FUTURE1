@@ -1,21 +1,17 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useState } from "react";
-import BackgroundVideo from "@/components/BackgroundVideo";
-import LeftTypewriter from "@/components/LeftTypewriter";
-import RadialVideoButtons from "@/components/RadialVideoButtons";
-import BottomNavigation from "@/components/BottomNavigation";
-import BirthdayEntry from "@/components/BirthdayEntry";
-import ZodiacDisplay from "@/components/ZodiacDisplay";
-import Scope from "@/components/Scope"; // New import
 
-const RetroGeometry = dynamic(() => import("@/components/RetroGeometry"), {
-  ssr: false,
-});
-
-const CornerLogo = dynamic(() => import("@/components/CornerLogo"), {
-  ssr: false,
-});
+// Dynamically import all components to avoid SSR issues
+const BackgroundVideo = dynamic(() => import("@/components/BackgroundVideo"), { ssr: false });
+const LeftTypewriter = dynamic(() => import("@/components/LeftTypewriter"), { ssr: false });
+const RadialVideoButtons = dynamic(() => import("@/components/RadialVideoButtons"), { ssr: false });
+const BottomNavigation = dynamic(() => import("@/components/BottomNavigation"), { ssr: false });
+const BirthdayEntry = dynamic(() => import("@/components/BirthdayEntry"), { ssr: false });
+const ZodiacDisplay = dynamic(() => import("@/components/ZodiacDisplay"), { ssr: false });
+const Scope = dynamic(() => import("@/components/Scope"), { ssr: false });
+const RetroGeometry = dynamic(() => import("@/components/RetroGeometry"), { ssr: false });
+const CornerLogo = dynamic(() => import("@/components/CornerLogo"), { ssr: false });
 
 export default function Page() {
   const [userBirthday, setUserBirthday] = useState<Date | null>(null);
