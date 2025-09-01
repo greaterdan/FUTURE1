@@ -1,0 +1,4 @@
+# Don't ignore LFS files
+!.gitattributes
+!public/**/*.mp4
+!public/**/*.webm

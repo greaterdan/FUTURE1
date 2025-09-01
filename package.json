@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "git lfs pull && next build",
+    "build": "git lfs install && git lfs pull || echo 'LFS pull failed, continuing with build' && next build",
     "start": "next start",
     "lint": "next lint"
   },
