@@ -29,11 +29,11 @@ dist/
 .DS_Store
 Thumbs.db
 
-# Large video files
-public/*.mp4
-public/*.webm
-public/zodiac/*.webm
-public/Space_Time_Travel__Seamless_VJ_Loop_uhd_2533132.mp4
+# Large video files - but allow specific ones needed for the app
+# public/*.mp4
+# public/*.webm
+# public/zodiac/*.webm
+# public/Space_Time_Travel__Seamless_VJ_Loop_uhd_2533132.mp4
 
 # Logs
 *.log

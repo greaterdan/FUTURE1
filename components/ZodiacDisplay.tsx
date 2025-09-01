@@ -26,24 +26,24 @@ export default function ZodiacDisplay({ zodiacSign, onComplete }: ZodiacDisplayP
     };
   }, [onComplete]);
 
-  const getZodiacVideo = (sign: string): string => {
-    // Map zodiac signs to .webm files (all converted for web compatibility)
-    const zodiacVideos: { [key: string]: string } = {
-      aries: "/zodiac/aries.webm",
-      taurus: "/zodiac/taurus.webm",
-      gemini: "/zodiac/gemini.webm",
-      cancer: "/zodiac/cancer.webm",
-      leo: "/zodiac/leo.webm",
-      virgo: "/zodiac/virgo.webm",
-      libra: "/zodiac/libra.webm",
-      scorpio: "/zodiac/scorpio.webm",
-      sagittarius: "/zodiac/sagittarius.webm",
-      capricorn: "/zodiac/capricorn.webm",
-      aquarius: "/zodiac/aquarius.webm",
-      pisces: "/zodiac/pisces.webm"
+  const getZodiacColor = (sign: string): string => {
+    // Map zodiac signs to colors
+    const zodiacColors: { [key: string]: string } = {
+      aries: "#FF6B6B",
+      taurus: "#4ECDC4", 
+      gemini: "#45B7D1",
+      cancer: "#96CEB4",
+      leo: "#FFEAA7",
+      virgo: "#DDA0DD",
+      libra: "#98D8C8",
+      scorpio: "#F7DC6F",
+      sagittarius: "#BB8FCE",
+      capricorn: "#85C1E9",
+      aquarius: "#F8C471",
+      pisces: "#82E0AA"
     };
     
-    return zodiacVideos[sign] || "/zodiac/aries.webm";
+    return zodiacColors[sign] || "#FF6B6B";
   };
 
   return (
@@ -57,16 +57,16 @@ export default function ZodiacDisplay({ zodiacSign, onComplete }: ZodiacDisplayP
           {zodiacSign}
         </h2>
         
-        <div className="w-96 h-96 mx-auto">
-          <video
-            src={getZodiacVideo(zodiacSign)}
-            autoPlay
-            muted
-            loop
-            playsInline
-            className="w-full h-full object-cover rounded-lg"
-            onError={(e) => console.error(`Zodiac video failed to load: ${zodiacSign}`, e)}
-          />
+        <div 
+          className="w-96 h-96 mx-auto rounded-lg flex items-center justify-center"
+          style={{ 
+            backgroundColor: getZodiacColor(zodiacSign),
+            animation: 'pulse 2s infinite'
+          }}
+        >
+          <div className="text-6xl text-white font-bold" style={{ fontFamily: 'VT323, monospace' }}>
+            {zodiacSign.charAt(0).toUpperCase()}
+          </div>
         </div>
         
         <p className="text-xl text-white/80" style={{ fontFamily: 'VT323, monospace' }}>

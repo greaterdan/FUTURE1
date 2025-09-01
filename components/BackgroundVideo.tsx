@@ -34,7 +34,7 @@ export default function BackgroundVideo({ isSlow = false }: Props) {
         opacity: isLoaded ? 1 : 0,
         objectFit: 'cover'
       }}
-      src="/Space_Time_Travel__Seamless_VJ_Loop_uhd_2533132.mp4"
+      src="https://sample-videos.com/zip/10/mp4/SampleVideo_1280x720_1mb.mp4"
       autoPlay
       muted
       loop

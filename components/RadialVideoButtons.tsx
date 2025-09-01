@@ -19,21 +19,13 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
   const animationRef = useRef<number | undefined>(undefined);
 
   const BUTTONS = [
-    { pos: "top",    src: "/1.webm", alt: "Top",    onClick: () => setIsNavigationHubOpen(true) },
-    { pos: "right",  src: "/2.webm", alt: "Right",  onClick: () => console.log("Right") },
-    { pos: "bottom", src: "/3.webm", alt: "Bottom", onClick: () => setIsScopeOpen(true) },
-    { pos: "left",   src: "/4.webm", alt: "Left",   onClick: () => console.log("Left") },
+    { pos: "top",    color: "#FF6B6B", alt: "Top",    onClick: () => setIsNavigationHubOpen(true) },
+    { pos: "right",  color: "#4ECDC4", alt: "Right",  onClick: () => console.log("Right") },
+    { pos: "bottom", color: "#45B7D1", alt: "Bottom", onClick: () => setIsScopeOpen(true) },
+    { pos: "left",   color: "#96CEB4", alt: "Left",   onClick: () => console.log("Left") },
   ];
 
-  useEffect(() => {
-    // Force videos to load and play
-    videoRefs.current.forEach((video, index) => {
-      if (video) {
-        video.load();
-        video.play().catch(e => console.error(`Video ${index} play error:`, e));
-      }
-    });
-  }, []);
+  // Removed video loading effect since we're using colored buttons now
 
   // Staggered appearance of buttons after zoom animation
   useEffect(() => {
@@ -92,7 +84,7 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
           onMouseEnter={() => setIsHovering(true)}
           onMouseLeave={() => setIsHovering(false)}
         >
-          {BUTTONS.map(({ pos, src, alt, onClick }, index) => (
+          {BUTTONS.map(({ pos, color, alt, onClick }, index) => (
             <div
               key={pos}
               className="absolute w-20 h-20 rounded-full pointer-events-auto cursor-pointer overflow-hidden transition-opacity duration-500"
@@ -115,21 +107,15 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
               }}
               onMouseLeave={() => setHoveredButton(null)}
             >
-              <video
-                ref={(el) => {
-                  videoRefs.current[index] = el;
+              <div 
+                className="w-full h-full rounded-full flex items-center justify-center text-white font-bold text-lg"
+                style={{ 
+                  backgroundColor: BUTTONS[index].color,
+                  animation: 'pulse 2s infinite'
                 }}
-                src={src}
-                muted
-                playsInline
-                autoPlay
-                loop
-                preload="auto"
-                className="w-full h-full object-cover"
-                onError={(e) => console.error(`Video ${src} failed:`, e)}
-                onLoadStart={() => console.log(`Loading: ${src}`)}
-                onCanPlay={() => console.log(`Can play: ${src}`)}
-              />
+              >
+                {BUTTONS[index].pos.charAt(0).toUpperCase()}
+              </div>
             </div>
           ))}
         </div>
