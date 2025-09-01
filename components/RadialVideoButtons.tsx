@@ -163,6 +163,24 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
         </div>
       )}
       
+      {/* Tooltip for Oracle */}
+      {hoveredButton === "left" && (
+        <div 
+          className="fixed z-[60] bg-black/90 border border-white/20 rounded-lg p-4 text-white max-w-xs pointer-events-none"
+          style={{
+            left: mousePosition.x + 10,
+            top: mousePosition.y - 10,
+            transform: 'translateY(-100%)',
+            fontFamily: 'VT323, monospace',
+          }}
+        >
+          <div className="text-lg font-bold mb-2">Oracle</div>
+          <div className="text-sm text-white/80 leading-relaxed">
+            Retrocausality made conversational. AI agents debate trades as if tomorrow already happened, weaving time-bent insights into a market outlook.
+          </div>
+        </div>
+      )}
+      
       {/* Navigation Hub */}
       <NavigationHub 
         isOpen={isNavigationHubOpen} 
