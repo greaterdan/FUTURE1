@@ -34,11 +34,15 @@ export default function BackgroundVideo({ isSlow = false }: Props) {
         opacity: isLoaded ? 1 : 0,
         objectFit: 'cover'
       }}
-      src="/Space_Time_Travel__Seamless_VJ_Loop_uhd_2533132.mp4"
+      src="/1.webm"
       autoPlay
       muted
       loop
       playsInline
+      onError={(e) => console.error('Background video failed to load:', e)}
+      onLoadStart={() => console.log('Background video loading started')}
+      onCanPlay={() => console.log('Background video can play')}
+      onLoadedData={() => console.log('Background video data loaded')}
     />
   );
 }
