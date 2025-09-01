@@ -23,6 +23,12 @@ export async function GET() {
     });
     const heliusData = await response.json();
 
+    // Check if the response has the expected structure
+    if (!heliusData.result || !heliusData.result.items) {
+      console.error('Invalid response structure:', heliusData);
+      return NextResponse.json({ error: "Invalid API response structure" }, { status: 500 });
+    }
+
     // Map and classify
     const tokens = heliusData.result.items.map((item: any) => {
       const createdAt = new Date(item.token_info?.createdAt || Date.now());

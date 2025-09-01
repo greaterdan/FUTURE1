@@ -20,6 +20,12 @@ export async function GET() {
     });
     const data = await response.json();
     
+    // Check if the response has the expected structure
+    if (!data.result) {
+      console.error('Invalid response structure:', data);
+      return NextResponse.json({ error: "Invalid API response structure" }, { status: 500 });
+    }
+    
     const transactions = data.result.map((sig: any) => ({
       signature: sig.signature,
       timestamp: sig.blockTime,
