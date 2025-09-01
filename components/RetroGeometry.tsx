@@ -46,9 +46,8 @@ export default function RetroGeometry({ isSlow = false }: Props) {
         mouseY = p.mouseY;
         mouseInCanvas = true;
       };
-      // Use mouseOver and mouseOut events instead of mouseEntered/mouseExited
-      p.mouseOver = () => { mouseInCanvas = true; };
-      p.mouseOut = () => { mouseInCanvas = false; };
+      // Mouse tracking is handled by mouseMoved and mouseDragged
+      // mouseInCanvas will be set to true when mouse moves within canvas bounds
 
       p.windowResized = () => {
         p.resizeCanvas(p.windowWidth, p.windowHeight);
@@ -114,8 +113,14 @@ export default function RetroGeometry({ isSlow = false }: Props) {
           zoomLevel += 0.005 * slowFactor;
         }
 
+        // Check if mouse is within canvas bounds and update mouseInCanvas accordingly
+        const mouseInBounds = mouseX >= 0 && mouseX <= p.width && mouseY >= 0 && mouseY <= p.height;
+        if (!mouseInBounds) {
+          mouseInCanvas = false;
+        }
+        
         // Draw the geometric cursor when inside the canvas bounds
-        if (mouseX >= 0 && mouseX <= p.width && mouseY >= 0 && mouseY <= p.height && mouseInCanvas) {
+        if (mouseInBounds && mouseInCanvas) {
           drawCursor(p);
         }
 
