@@ -14,7 +14,7 @@ export default function LogoGeometry() {
       let mouseX = 0;
       let mouseY = 0;
       let mouseInCanvas = false;
-      const DENSITY = Math.min(window.devicePixelRatio || 1, 2);
+      const DENSITY = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
 
       // Add window-level mouse tracking
       const handleMouseEnter = () => {
@@ -37,9 +37,11 @@ export default function LogoGeometry() {
         // Start with black background to prevent video flash
         p.background(0);
         
-        // Add event listeners to the window
-        window.addEventListener('mouseenter', handleMouseEnter);
-        window.addEventListener('mouseleave', handleMouseLeave);
+        // Add event listeners to the window (only if window exists)
+        if (typeof window !== 'undefined') {
+          window.addEventListener('mouseenter', handleMouseEnter);
+          window.addEventListener('mouseleave', handleMouseLeave);
+        }
       };
 
       p.mouseMoved = () => {

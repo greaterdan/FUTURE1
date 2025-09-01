@@ -21,7 +21,7 @@ export default function RetroGeometry({ isSlow = false }: Props) {
       let mouseInCanvas = false;
       let canvasReady = false;
       let zoomLevel = 0; // 0 = invisible, 1 = full size
-      const DENSITY = Math.min(window.devicePixelRatio || 1, 2);
+      const DENSITY = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
 
       const S = () => Math.min(p.width, p.height) / 1800; // Smaller scale
 

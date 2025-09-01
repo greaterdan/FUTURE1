@@ -15,7 +15,7 @@ export default function CornerLogo({ size = 64 }: { size?: number }) {
       let bgVideo: HTMLVideoElement | null = null;
       let t = 0;
 
-      const D = Math.min(window.devicePixelRatio || 1, 2);
+      const D = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
       const S = () => Math.min(p.width, p.height) / 1200;
 
       p.setup = () => {
