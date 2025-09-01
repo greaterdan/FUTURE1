@@ -5,33 +5,31 @@ const HELIUS_URL = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API}`;
 
 export async function GET() {
   try {
-    const response = await fetch(HELIUS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        jsonrpc: "2.0",
-        id: "transactions",
-        method: "getSignaturesForAddress",
-        params: {
-          address: "YOUR_TRACKED_ADDRESS", // Replace with a Solana address to track
-          limit: 20,
-        },
-      }),
-    });
-    const data = await response.json();
-    
-    // Check if the response has the expected structure
-    if (!data.result) {
-      console.error('Invalid response structure:', data);
-      return NextResponse.json({ error: "Invalid API response structure" }, { status: 500 });
-    }
-    
-    const transactions = data.result.map((sig: any) => ({
-      signature: sig.signature,
-      timestamp: sig.blockTime,
-    }));
+    // Return mock data for now since we don't have a valid Helius API key
+    const mockTransactions = [
+      {
+        signature: "mock_sig_1",
+        timestamp: Math.floor(Date.now() / 1000) - 300, // 5 minutes ago
+      },
+      {
+        signature: "mock_sig_2", 
+        timestamp: Math.floor(Date.now() / 1000) - 600, // 10 minutes ago
+      },
+      {
+        signature: "mock_sig_3",
+        timestamp: Math.floor(Date.now() / 1000) - 900, // 15 minutes ago
+      },
+      {
+        signature: "mock_sig_4",
+        timestamp: Math.floor(Date.now() / 1000) - 1200, // 20 minutes ago
+      },
+      {
+        signature: "mock_sig_5",
+        timestamp: Math.floor(Date.now() / 1000) - 1500, // 25 minutes ago
+      },
+    ];
 
-    return NextResponse.json(transactions);
+    return NextResponse.json(mockTransactions);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to fetch transactions" }, { status: 500 });

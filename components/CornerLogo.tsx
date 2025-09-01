@@ -19,9 +19,11 @@ export default function CornerLogo({ size = 64 }: { size?: number }) {
       const S = () => Math.min(p.width, p.height) / 1200;
 
       p.setup = () => {
-        p.createCanvas(size, size);
+        const canvas = p.createCanvas(size, size);
         // make the logo canvas transparent
-        (p.canvas as HTMLCanvasElement).style.background = "transparent";
+        if (canvas && canvas.elt) {
+          (canvas.elt as HTMLCanvasElement).style.background = "transparent";
+        }
         p.pixelDensity(D);
 
         gfx   = p.createGraphics(p.width, p.height);
