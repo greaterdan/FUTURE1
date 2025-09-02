@@ -2,7 +2,12 @@
 import { useEffect, useRef } from "react";
 import p5 from "p5";
 
-export default function CornerLogo({ size = 64 }: { size?: number }) {
+interface CornerLogoProps {
+  size?: number;
+  isVisible?: boolean;
+}
+
+export default function CornerLogo({ size = 64, isVisible = true }: CornerLogoProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -163,7 +168,9 @@ export default function CornerLogo({ size = 64 }: { size?: number }) {
   return (
     <div
       ref={hostRef}
-      className="fixed top-4 left-4 z-[80] pointer-events-none"
+      className={`fixed top-4 left-4 z-[80] pointer-events-none transition-opacity duration-700 ease-in-out ${
+        isVisible ? 'opacity-100' : 'opacity-0'
+      }`}
       style={{ width: size, height: size }}
     />
   );

@@ -38,7 +38,7 @@ export default function ZodiacDisplay({ zodiacSign, onComplete }: ZodiacDisplayP
       libra: "/zodiac/libra.webm",
       scorpio: "/zodiac/scorpio.webm",
       sagittarius: "/zodiac/sagittarius.webm",
-      capricorn: "/zodiac/capricorn.webm",
+      capricorn: "/zodiac/capricorn.webm",  
       aquarius: "/zodiac/aquarius.webm",
       pisces: "/zodiac/pisces.webm"
     };

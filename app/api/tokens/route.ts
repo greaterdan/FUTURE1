@@ -49,7 +49,7 @@ export async function GET() {
       },
     ];
 
-        return NextResponse.json(mockTokens);
+    return NextResponse.json(mockTokens);
   } catch (err) {
     console.error(err);
     return NextResponse.json({ error: "Failed to fetch tokens" }, { status: 500 });

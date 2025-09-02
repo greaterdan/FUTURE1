@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 // Dynamically import all components to avoid SSR issues
 const BackgroundVideo = dynamic(() => import("@/components/BackgroundVideo"), { ssr: false });
@@ -19,7 +20,20 @@ export default function Page() {
   const [showMainPage, setShowMainPage] = useState(false);
   const [isNavigationHubOpen, setIsNavigationHubOpen] = useState(false);
   const [isScopeOpen, setIsScopeOpen] = useState(false);
+  const [isOracleHubOpen, setIsOracleHubOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Debug logging for state changes
+  useEffect(() => {
+    console.log("🎯 STATE CHANGED - isScopeOpen:", isScopeOpen, "isNavigationHubOpen:", isNavigationHubOpen, "isOracleHubOpen:", isOracleHubOpen);
+    
+    // Additional debug info
+    if (isScopeOpen) {
+      console.log("🎯 SCOPE IS NOW OPEN - This should trigger useSolanaData to start monitoring");
+    } else {
+      console.log("🎯 SCOPE IS NOW CLOSED - useSolanaData should stop monitoring");
+    }
+  }, [isScopeOpen, isNavigationHubOpen, isOracleHubOpen]);
 
   // Check localStorage on component mount
   useEffect(() => {
@@ -30,6 +44,9 @@ export default function Page() {
       setUserBirthday(new Date(savedBirthday));
       setZodiacSign(savedZodiacSign);
       setShowMainPage(true);
+    } else {
+      // If no saved data, still set loading to false so we can show birthday entry
+      setShowMainPage(false);
     }
     
     setIsLoading(false);
@@ -71,6 +88,15 @@ export default function Page() {
   if (isLoading) {
     return <div className="fixed inset-0 bg-black flex items-center justify-center">
       <div className="text-white text-xl">Loading...</div>
+      <button 
+        onClick={() => {
+          localStorage.clear();
+          window.location.reload();
+        }}
+        className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded border border-white/20"
+      >
+        Reset App (Debug)
+      </button>
     </div>;
   }
 
@@ -86,19 +112,34 @@ export default function Page() {
 
   // Show main page
   return (
-    <main className="fixed inset-0 overflow-visible">
-      <BackgroundVideo />
-      <RetroGeometry isSlow={isNavigationHubOpen} />
-      <LeftTypewriter />
-      {!isScopeOpen && !isNavigationHubOpen && <CornerLogo size={64} />}
-      <RadialVideoButtons 
-        isNavigationHubOpen={isNavigationHubOpen}
-        setIsNavigationHubOpen={setIsNavigationHubOpen}
-        isScopeOpen={isScopeOpen}
-        setIsScopeOpen={setIsScopeOpen}
-      />
-      <BottomNavigation isNavigationHubOpen={isNavigationHubOpen} />
-      <Scope isOpen={isScopeOpen} onClose={() => setIsScopeOpen(false)} />
-    </main>
+    <ErrorBoundary>
+      <main className="fixed inset-0 overflow-visible">
+        <BackgroundVideo isOracleOpen={isOracleHubOpen} />
+        <RetroGeometry isSlow={isNavigationHubOpen} isOracleOpen={isOracleHubOpen} />
+        {!isOracleHubOpen && <LeftTypewriter />}
+        <CornerLogo size={64} isVisible={!isScopeOpen && !isNavigationHubOpen && !isOracleHubOpen} />
+        <RadialVideoButtons 
+          isNavigationHubOpen={isNavigationHubOpen}
+          setIsNavigationHubOpen={setIsNavigationHubOpen}
+          isScopeOpen={isScopeOpen}
+          setIsScopeOpen={setIsScopeOpen}
+          isOracleHubOpen={isOracleHubOpen}
+          setIsOracleHubOpen={setIsOracleHubOpen}
+        />
+        
+        {/* DEBUG: Test button to manually open Scope */}
+        <button
+          onClick={() => {
+            console.log("🎯 DEBUG BUTTON CLICKED - Manually setting isScopeOpen to true");
+            setIsScopeOpen(true);
+          }}
+          className="fixed top-4 right-4 z-50 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+        >
+          DEBUG: Open Scope
+        </button>
+        <BottomNavigation isNavigationHubOpen={isNavigationHubOpen} isOracleHubOpen={isOracleHubOpen} />
+        <Scope isOpen={isScopeOpen} />
+      </main>
+    </ErrorBoundary>
   );
 }

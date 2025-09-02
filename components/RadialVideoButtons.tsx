@@ -1,40 +1,96 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import NavigationHub from "./NavigationHub";
+import OracleHub from "./OracleHub";
 
 interface RadialVideoButtonsProps {
   isNavigationHubOpen: boolean;
   setIsNavigationHubOpen: (open: boolean) => void;
   isScopeOpen: boolean;
   setIsScopeOpen: (open: boolean) => void;
+  isOracleHubOpen: boolean;
+  setIsOracleHubOpen: (open: boolean) => void;
 }
 
-export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigationHubOpen, isScopeOpen, setIsScopeOpen }: RadialVideoButtonsProps) {
+export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigationHubOpen, isScopeOpen, setIsScopeOpen, isOracleHubOpen, setIsOracleHubOpen }: RadialVideoButtonsProps) {
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
   const [rotation, setRotation] = useState(0);
   const [isHovering, setIsHovering] = useState(false);
   const [hoveredButton, setHoveredButton] = useState<string | null>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [visibleButtons, setVisibleButtons] = useState<number[]>([]);
+  const [isRotationPaused, setIsRotationPaused] = useState(false);
   const animationRef = useRef<number | undefined>(undefined);
+  const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [hasButtonsAppeared, setHasButtonsAppeared] = useState(false);
 
   const BUTTONS = [
     { pos: "top",    color: "#FF6B6B", alt: "Top",    onClick: () => setIsNavigationHubOpen(true), video: "/1.webm" },
     { pos: "right",  color: "#4ECDC4", alt: "Right",  onClick: () => console.log("Right"), video: "/2.webm" },
-    { pos: "bottom", color: "#45B7D1", alt: "Bottom", onClick: () => setIsScopeOpen(true), video: "/3.webm" },
-    { pos: "left",   color: "#96CEB4", alt: "Left",   onClick: () => console.log("Left"), video: "/4.webm" },
+    { pos: "bottom", color: "#45B7D1", alt: "Bottom", onClick: () => {
+      console.log("🎯 BOTTOM BUTTON CLICKED - Setting isScopeOpen to true");
+      console.log("🎯 BEFORE: isScopeOpen should be false");
+      console.log("🎯 Button click handler executed successfully");
+      console.log("🎯 About to call setIsScopeOpen(true)");
+      
+      try {
+        setIsScopeOpen(true);
+        console.log("🎯 AFTER: setIsScopeOpen(true) called successfully");
+        
+        // Force a re-render to see the state change
+        setTimeout(() => {
+          console.log("🎯 DELAYED CHECK: isScopeOpen should still be true");
+        }, 100);
+      } catch (error) {
+        console.error("🎯 ERROR in button click handler:", error);
+      }
+    }, video: "/3.webm" },
+    { pos: "left",   color: "#96CEB4", alt: "Left",   onClick: () => setIsOracleHubOpen(true), video: "/4.webm" },
   ];
+
+  // Debug: Log when buttons are rendered (but only when state changes to avoid infinite loops)
+  useEffect(() => {
+    console.log("🎯 BUTTONS STATE CHANGED - isScopeOpen:", isScopeOpen, "isNavigationHubOpen:", isNavigationHubOpen, "isOracleHubOpen:", isOracleHubOpen);
+  }, [isScopeOpen, isNavigationHubOpen, isOracleHubOpen]);
 
   // Removed video loading effect since we're using colored buttons now
 
-  // Staggered appearance of buttons after zoom animation
+  // Check if buttons have appeared before on component mount
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const buttonsAppeared = sessionStorage.getItem('buttonsHaveAppeared');
+      setHasButtonsAppeared(buttonsAppeared === 'true');
+    }
+  }, []);
+
+  // Staggered appearance of buttons after zoom animation, or show all immediately if any hub is open
+  useEffect(() => {
+    // If any hub is open, show all buttons immediately
+    if (isNavigationHubOpen || isScopeOpen || isOracleHubOpen) {
+      setVisibleButtons([0, 1, 2, 3]);
+      return;
+    }
+
+    // If buttons have appeared before, show them immediately
+    if (hasButtonsAppeared) {
+      setVisibleButtons([0, 1, 2, 3]);
+      return;
+    }
+
     const timer = setTimeout(() => {
-      // Start appearing buttons one by one with 300ms delay between each
+      // Start appearing buttons one by one with 800ms delay between each
       const showButtons = () => {
         setVisibleButtons(prev => {
           if (prev.length < 4) {
-            return [...prev, prev.length];
+            const newButtons = [...prev, prev.length];
+            // Mark as appeared when all buttons are shown
+            if (newButtons.length === 4) {
+              setHasButtonsAppeared(true);
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('buttonsHaveAppeared', 'true');
+              }
+            }
+            return newButtons;
           }
           return prev;
         });
@@ -50,14 +106,19 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
     }, 3500); // Wait for zoom animation to fully complete (zoom takes ~3.5 seconds)
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [isNavigationHubOpen, isScopeOpen, isOracleHubOpen, hasButtonsAppeared]);
 
   useEffect(() => {
     // Start rotation immediately when zoom finishes (when first button appears)
     if (visibleButtons.length > 0) {
       const animate = () => {
-        if (!isHovering) {
-          const speed = isNavigationHubOpen ? -0.2 : -0.5; // slower when hub open
+        // Only rotate when not paused and not hovering
+        if (!isRotationPaused && !hoveredButton) {
+          // Adjust speed based on which hub is open
+          let speed = -0.5; // default speed
+          if (isNavigationHubOpen) speed = -0.2; // slower when navigation hub open
+          if (isOracleHubOpen) speed = -0.3; // medium speed when oracle hub open
+          
           setRotation(prev => prev + speed);
         }
         animationRef.current = requestAnimationFrame(animate);
@@ -71,18 +132,19 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
         }
       };
     }
-  }, [isHovering, visibleButtons.length, isNavigationHubOpen]);
+  }, [visibleButtons.length, isNavigationHubOpen, isOracleHubOpen, hoveredButton, isRotationPaused]);
 
   return (
     <>
       <div className="fixed inset-0 z-[30] pointer-events-none">
         <div 
-          className="absolute top-1/2 left-[75%] -translate-y-1/2 pointer-events-none"
+          className={`absolute top-1/2 -translate-y-1/2 pointer-events-auto transition-all duration-700 ease-in-out ${
+            isOracleHubOpen ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+          }`}
           style={{
+            left: '75%',
             transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
           }}
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
         >
           {BUTTONS.map(({ pos, color, alt, onClick }, index) => (
             <div
@@ -95,17 +157,34 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
                 backgroundColor: "transparent",
                 opacity: visibleButtons.includes(index) ? 1 : 0,
               }}
-              onClick={onClick}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClick();
+              }}
               onMouseEnter={(e) => {
+                e.stopPropagation();
                 setHoveredButton(pos);
                 setMousePosition({ x: e.clientX, y: e.clientY });
+                setIsRotationPaused(true);
+                // Clear any existing timeout
+                if (pauseTimeoutRef.current) {
+                  clearTimeout(pauseTimeoutRef.current);
+                }
               }}
               onMouseMove={(e) => {
+                e.stopPropagation();
                 if (hoveredButton === pos) {
                   setMousePosition({ x: e.clientX, y: e.clientY });
                 }
               }}
-              onMouseLeave={() => setHoveredButton(null)}
+              onMouseLeave={(e) => {
+                e.stopPropagation();
+                setHoveredButton(null);
+                // Add a delay before resuming rotation to prevent interference
+                pauseTimeoutRef.current = setTimeout(() => {
+                  setIsRotationPaused(false);
+                }, 300); // 300ms delay
+              }}
             >
               <div 
                 className="w-full h-full rounded-full overflow-hidden"
@@ -185,6 +264,12 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
       <NavigationHub 
         isOpen={isNavigationHubOpen} 
         onClose={() => setIsNavigationHubOpen(false)} 
+      />
+      
+      {/* Oracle Hub */}
+      <OracleHub 
+        isOpen={isOracleHubOpen} 
+        onClose={() => setIsOracleHubOpen(false)} 
       />
     </>
   );

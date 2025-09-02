@@ -4,15 +4,21 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "git lfs install && git lfs pull || echo 'LFS pull failed, continuing with build' && node scripts/check-videos.js && npm run build:next",
-    "build:next": "next build",
+    "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
+    "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
+    "@pythnetwork/client": "^2.22.1",
+    "@solana/spl-token": "^0.4.13",
+    "@solana/web3.js": "^1.98.4",
+    "@tanstack/react-virtual": "^3.13.12",
     "@types/p5": "^1.7.6",
     "autoprefixer": "^10.4.21",
-    "next": "14.2.5",
+    "framer-motion": "^12.23.12",
+    "lucide-react": "^0.542.0",
+    "next": "^14.2.32",
     "p5": "^1.11.10",
     "react": "^18",
     "react-dom": "^18",
@@ -29,4 +35,3 @@
     "typescript": "^5"
   }
 }
-

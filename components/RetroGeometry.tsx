@@ -2,16 +2,32 @@
 import { useEffect, useRef } from "react";
 import p5 from "p5";
 
-interface Props { isSlow?: boolean }
+interface Props { isSlow?: boolean; isOracleOpen?: boolean }
 
-export default function RetroGeometry({ isSlow = false }: Props) {
+export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const slowRef = useRef<boolean>(isSlow);
+  const oracleOpenRef = useRef<boolean>(isOracleOpen);
+  const hasZoomedRef = useRef<boolean>(false);
+
+  // Check sessionStorage on component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hasZoomed = sessionStorage.getItem('geometryHasZoomed');
+      hasZoomedRef.current = hasZoomed === 'true';
+    }
+  }, []);
 
   useEffect(() => { slowRef.current = isSlow; }, [isSlow]);
+  useEffect(() => { oracleOpenRef.current = isOracleOpen; }, [isOracleOpen]);
 
   useEffect(() => {
     if (!hostRef.current) return;
+
+    // Clean up any existing instance
+    if (hostRef.current.children.length > 0) {
+      hostRef.current.innerHTML = '';
+    }
 
     const sketch = (p: p5) => {
       let gfx: p5.Graphics;
@@ -20,7 +36,11 @@ export default function RetroGeometry({ isSlow = false }: Props) {
       let mouseY = 0;
       let mouseInCanvas = false;
       let canvasReady = false;
-      let zoomLevel = 0; // 0 = invisible, 1 = full size
+      let zoomLevel = hasZoomedRef.current ? 1 : 0; // Start at full size if already zoomed
+      let currentGeometryX = p.width * 0.75; // Start at right side (default position)
+      let currentOuterX = p.width * 0.75; // Start at right side (default position)
+      let previousOracleState = false; // Track previous Oracle state
+      let hasStartedAnimation = false; // Track if Oracle animation has started
       const DENSITY = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
 
       const S = () => Math.min(p.width, p.height) / 1800; // Smaller scale
@@ -57,13 +77,34 @@ export default function RetroGeometry({ isSlow = false }: Props) {
 
       p.draw = () => {
         const slowFactor = slowRef.current ? 0.35 : 1.0;
+        const isOracleOpen = oracleOpenRef.current;
 
+        // Fill the entire screen with black background
         p.background(0);
         gfx.clear();
         gfx.push();
-        gfx.translate(p.width * 0.75, p.height / 2);
+        // Move geometry to center of left half when Oracle hub is open with smooth transition
+        const targetX = isOracleOpen ? p.width * 0.25 : p.width * 0.75;
+        
+        // Check if Oracle state changed (this triggers animation)
+        if (isOracleOpen !== previousOracleState) {
+          hasStartedAnimation = true;
+          previousOracleState = isOracleOpen;
+        }
+        
+        // Only animate if Oracle animation has started
+        if (hasStartedAnimation) {
+          currentGeometryX = p.lerp(currentGeometryX, targetX, 0.06); // Slower and smoother transition
+        } else {
+          currentGeometryX = targetX; // Set directly to avoid initial movement
+        }
+        
+        gfx.translate(currentGeometryX, p.height / 2);
 
-        const currentScale = Math.pow(zoomLevel, 0.8);
+        // Scale up geometry when Oracle is open to fill the left half better
+        const baseScale = Math.pow(zoomLevel, 0.8);
+        const oracleScale = isOracleOpen ? 1.8 : 1.0; // Scale up by 1.8x when Oracle open (smaller than before)
+        const currentScale = baseScale * oracleScale;
         gfx.scale(currentScale);
 
         gfx.rotate(t * 0.12 * slowFactor);
@@ -89,8 +130,21 @@ export default function RetroGeometry({ isSlow = false }: Props) {
         const outerGfx = p.createGraphics(p.width, p.height);
         outerGfx.pixelDensity(DENSITY);
         outerGfx.push();
-        outerGfx.translate(p.width * 0.75, p.height / 2);
-        outerGfx.scale(currentScale);
+        // Move outer geometry to left side when Oracle hub is open with smooth transition
+        const outerTargetX = isOracleOpen ? p.width * 0.25 : p.width * 0.75;
+        
+        // Only animate if Oracle animation has started
+        if (hasStartedAnimation) {
+          currentOuterX = p.lerp(currentOuterX, outerTargetX, 0.06); // Slower and smoother transition
+        } else {
+          currentOuterX = outerTargetX; // Set directly to avoid initial movement
+        }
+        
+        outerGfx.translate(currentOuterX, p.height / 2);
+        // Scale up outer ring when Oracle is open to fill the left half better
+        const outerOracleScale = isOracleOpen ? 1.8 : 1.0; // Scale up by 1.8x when Oracle open (smaller than before)
+        const outerCurrentScale = baseScale * outerOracleScale;
+        outerGfx.scale(outerCurrentScale);
         outerGfx.rotate(t * 0.12 * slowFactor);
         const R_outer = 720 * S();
         for (let glow = 22; glow >= 8; glow -= 7) {
@@ -109,8 +163,16 @@ export default function RetroGeometry({ isSlow = false }: Props) {
         p.image(outerGfx, 0, 0);
         ctx.globalCompositeOperation = "source-over";
 
-        if (zoomLevel < 1) {
+        // Only animate zoom once per session
+        if (!hasZoomedRef.current && zoomLevel < 1) {
           zoomLevel += 0.005 * slowFactor;
+          if (zoomLevel >= 1) {
+            hasZoomedRef.current = true; // Mark as zoomed for this session
+            // Save to sessionStorage so it persists across page refreshes
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('geometryHasZoomed', 'true');
+            }
+          }
         }
 
         // Check if mouse is within canvas bounds and update mouseInCanvas accordingly
@@ -203,8 +265,15 @@ export default function RetroGeometry({ isSlow = false }: Props) {
     };
 
     const instance = new p5(sketch, hostRef.current);
-    return () => instance.remove();
-  }, []);
+    return () => {
+      if (instance) {
+        instance.remove();
+      }
+      if (hostRef.current) {
+        hostRef.current.innerHTML = '';
+      }
+    };
+      }, [isOracleOpen]);
 
-  return <div ref={hostRef} className="fixed inset-0 overflow-visible" />;
+  return <div ref={hostRef} className="fixed inset-0 overflow-visible pointer-events-none" style={{ zIndex: 10 }} />;
 }

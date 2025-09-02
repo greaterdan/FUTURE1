@@ -12,6 +12,26 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* Prevent MetaMask from trying to connect to this Solana app */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Block MetaMask injection
+              if (typeof window !== 'undefined') {
+                window.ethereum = undefined;
+                window.web3 = undefined;
+                // Prevent MetaMask from detecting this as a web3 site
+                Object.defineProperty(window, 'ethereum', {
+                  get: () => undefined,
+                  set: () => {},
+                  configurable: false
+                });
+              }
+            `,
+          }}
+        />
+      </head>
       <body>{children}</body>
     </html>
   )
