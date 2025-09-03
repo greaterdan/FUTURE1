@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useSolanaData } from "../hooks/useSolanaData";
+
 
 import ImageWithFallback from './ImageWithFallback';
 import SocialBadges from './SocialBadges';
@@ -26,8 +26,8 @@ export function useVisibility(mint: string, visibleMintsRef: React.MutableRefObj
 }
 
 // Memoized TokenCard for performance
-type CardProps = { token: any; hot: boolean; visibleMintsRef: React.MutableRefObject<Set<string>> };
-const TokenCardBase: React.FC<CardProps> = React.memo(({ token, hot, visibleMintsRef }) => {
+type CardProps = { token: any; visibleMintsRef: React.MutableRefObject<Set<string>> };
+const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
   
   const copyMintAddress = async () => {
@@ -41,11 +41,17 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, hot, visibleMint
   return (
     <motion.div
       ref={cardRef}
-      layout={!hot}
-      transition={hot ? { duration: 0 } : { type: 'spring', stiffness: 140, damping: 18 }}
-      className="relative isolate overflow-visible rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm hover:scale-105 hover:z-10 transition-transform duration-200 token-card"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ 
+        duration: 0.15,
+        ease: "easeOut"
+      }}
+      className="relative isolate overflow-visible rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm hover:scale-105 hover:z-10 transition-all duration-200 token-card"
       style={{ willChange: 'transform' }}
     >
+
+      
       {/* Header row: avatar, name/symbol, copy button */}
       <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
         {/* Avatar container with HoverImagePreview */}
@@ -59,7 +65,9 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, hot, visibleMint
         
         {/* Token info */}
         <div className="min-w-0">
-          <h3 className="text-white font-semibold truncate">{token.name}</h3>
+          <h3 className="text-white font-semibold truncate">
+            {token.name}
+          </h3>
           <div className="text-green-400 text-sm font-mono truncate">{token.symbol}</div>
         </div>
         
@@ -125,13 +133,11 @@ export const TokenCard = React.memo(TokenCardBase, (prev, next) =>
 function TokenColumn({ 
   title, 
   items, 
-  hot, 
   className = "",
   visibleMintsRef
 }: { 
   title: string; 
   items: any[]; 
-  hot: boolean;
   className?: string;
   visibleMintsRef: React.MutableRefObject<Set<string>>;
 }) {
@@ -152,8 +158,11 @@ function TokenColumn({
                 {items.length} tokens
               </div>
               {items.map((token, index) => (
-                <div key={token.mint} className="relative">
-                  <TokenCard token={token} hot={hot} visibleMintsRef={visibleMintsRef} />
+                <div key={`${token.mint}-${token.updated_at || token.created_at || index}`} className="relative">
+                  <TokenCard 
+                    token={token} 
+                    visibleMintsRef={visibleMintsRef} 
+                  />
                 </div>
               ))}
             </>
@@ -171,12 +180,10 @@ export const Scope = ({
   lastUpdate, 
   stats, 
   connectionStatus, 
-  currentRpc, 
-  hot, 
   live, 
-  pendingCount, 
   resumeLive, 
-  pauseLive 
+  pauseLive,
+  onClose
 }: { 
   isOpen: boolean;
   tokens: any[];
@@ -184,12 +191,10 @@ export const Scope = ({
   lastUpdate: Date | null;
   stats: any;
   connectionStatus: string;
-  currentRpc: string;
-  hot: boolean;
   live: boolean;
-  pendingCount: number;
   resumeLive: () => void;
   pauseLive: () => void;
+  onClose: () => void;
 }) => {
   // Track visible mints for performance optimization
   const visibleMintsRef = useRef<Set<string>>(new Set());
@@ -202,6 +207,15 @@ export const Scope = ({
   // AI Agents state
   const [hoveredAgent, setHoveredAgent] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // Auto-close chat when Scope closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsChatOpen(false);
+      setMessages([]);
+      setInputMessage('');
+    }
+  }, [isOpen]);
 
   // AI Agents data
   const agents = [
@@ -231,7 +245,11 @@ export const Scope = ({
       connectionStatus,
       lastUpdate: lastUpdate?.toLocaleTimeString()
     });
+    
+
   }, [tokens, isLoading, connectionStatus, lastUpdate]);
+
+
 
   // Memoize filtered tokens to prevent recalculation on every render
   const filteredTokens = useMemo(() => {
@@ -245,12 +263,12 @@ export const Scope = ({
     console.log("🔍 Sample tokens:", tokens.slice(0, 3).map(t => ({
       name: t.name,
       symbol: t.symbol,
-      poolType: t.poolType
+      status: t.status
     })));
     
-    const newPairs = tokens.filter(t => t && t.poolType === 'none');
-    const onEdge = tokens.filter(t => t && t.poolType !== 'none' && t.poolType !== 'pumpfun');
-    const filled = tokens.filter(t => t && t.poolType === 'pumpfun');
+    const newPairs = tokens.filter(t => t && t.status === 'fresh');
+    const filled = tokens.filter(t => t && t.status === 'active');
+    const onEdge = tokens.filter(t => t && t.status === 'fresh' && t.latest_marketcap?.liquidity && t.latest_marketcap.liquidity > 0);
     
     console.log("✅ Filtered tokens:", {
       newPairs: newPairs.length,
@@ -305,37 +323,80 @@ export const Scope = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col scope-container">
+    <motion.div 
+      className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col scope-container"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ 
+        duration: 0.4, 
+        ease: [0.25, 0.46, 0.45, 0.94],
+        staggerChildren: 0.1
+      }}
+    >
       {/* Header */}
-      <div className="bg-black/80 border-b border-white/10 p-4 flex-shrink-0">
+      <motion.div 
+        className="bg-black/80 border-b border-white/10 p-4 flex-shrink-0"
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
-            <h1 className="text-2xl font-bold text-white">SCOPE</h1>
+            <motion.h1 
+              className="text-2xl font-bold text-white"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              SCOPE
+            </motion.h1>
             
             {/* Chat Toggle Button */}
-            <button
+            <motion.button
               onClick={() => setIsChatOpen(!isChatOpen)}
               className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
                 isChatOpen 
                   ? 'bg-green-600 hover:bg-blue-700 text-white' 
                   : 'bg-blue-700 hover:bg-blue-800 text-white'
               }`}
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
               <span className="text-sm font-medium">{isChatOpen ? 'Close Chat' : 'Chat'}</span>
-            </button>
-            
-
+            </motion.button>
           </div>
           
-
+          {/* Close Button - Top Right */}
+          <motion.button
+            onClick={onClose}
+            className="text-white/60 hover:text-white transition-colors duration-200"
+            initial={{ x: 20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
 
       {/* Main Content */}
-      <div className="p-6 flex-1 overflow-hidden relative h-full">
+      <motion.div 
+        className="p-6 flex-1 overflow-hidden relative h-full"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
@@ -358,23 +419,20 @@ export const Scope = ({
               isChatOpen ? 'w-[calc(100%-450px)]' : 'w-full'
             }`}>
               <TokenColumn 
-                title="New Pairs" 
+                title="Fresh Mints" 
                 items={filteredTokens.newPairs} 
-                hot={hot}
                 className="border-r border-gray-700 flex-1"
                 visibleMintsRef={visibleMintsRef}
               />
               <TokenColumn 
-                title="On Edge" 
+                title="Fresh + Liquidity" 
                 items={filteredTokens.onEdge} 
-                hot={hot}
                 className="border-r border-gray-700 flex-1"
                 visibleMintsRef={visibleMintsRef}
               />
               <TokenColumn 
-                title="Filled" 
+                title="Active Tokens" 
                 items={filteredTokens.filled} 
-                hot={hot}
                 className="flex-1"
                 visibleMintsRef={visibleMintsRef}
               />
@@ -397,15 +455,53 @@ export const Scope = ({
                       {agents.map((agent, index) => (
                         <div
                           key={index}
-                          className="relative w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-lg cursor-pointer overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-blue-500/50"
+                          draggable="true"
+                          className="relative w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-lg cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-blue-500/50"
                           onMouseEnter={() => setHoveredAgent(agent)}
                           onMouseLeave={() => setHoveredAgent(null)}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/plain', agent.name);
+                            
+                            // Create a custom drag preview that's bigger and animated
+                            const dragPreview = document.createElement('div');
+                            dragPreview.className = 'fixed pointer-events-none z-[9999] bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full shadow-2xl border-2 border-white/20';
+                            dragPreview.style.width = '80px';
+                            dragPreview.style.height = '80px';
+                            dragPreview.style.transform = 'translate(-50%, -50%)';
+                            dragPreview.style.transition = 'all 0.2s ease-out';
+                            
+                            // Add the agent initials
+                            dragPreview.innerHTML = `
+                              <div class="w-full h-full flex items-center justify-center text-white font-bold text-lg">
+                                ${agent.name.split(' ').map(word => word[0]).join('')}
+                              </div>
+                            `;
+                            
+                            document.body.appendChild(dragPreview);
+                            
+                            // Set the custom drag image
+                            e.dataTransfer.setDragImage(dragPreview, 40, 40);
+                            
+                            // Remove the preview after drag starts
+                            setTimeout(() => {
+                              if (document.body.contains(dragPreview)) {
+                                document.body.removeChild(dragPreview);
+                              }
+                            }, 100);
+                          }}
+                          onDragEnd={(e) => {
+                            // Clean up any remaining previews
+                            const previews = document.querySelectorAll('[style*="pointer-events-none"]');
+                            previews.forEach(preview => {
+                              if (preview.parentNode) {
+                                preview.parentNode.removeChild(preview);
+                              }
+                            });
+                          }}
                         >
                           <div className="w-full h-full flex items-center justify-center text-white font-bold text-xs text-center leading-tight">
                             {agent.name.split(' ').map(word => word[0]).join('')}
                           </div>
-                          
-
                         </div>
                       ))}
                     </div>
@@ -470,10 +566,11 @@ export const Scope = ({
             </div>
           </div>
         )}
-      </div>
+      </motion.div>
 
 
-    </div>
+
+    </motion.div>
   );
 };
 
