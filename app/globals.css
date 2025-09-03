@@ -193,6 +193,29 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
   transform: scale(1.02) translateZ(0);
 }
 
+/* Video transparency support for .webm files */
+video[src*=".webm"],
+video source[src*=".webm"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Ensure companion videos have no background */
+.companion-video,
+.companion-video video {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Force transparency on all video elements */
+video {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
 /* Smooth rotation container */
 .radial-video-buttons .rotating-container {
   transition: transform 0.1s linear;

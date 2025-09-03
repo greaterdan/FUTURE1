@@ -112,14 +112,14 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
 
   // Staggered appearance of buttons after zoom animation, or show all immediately if any hub is open
   useEffect(() => {
-    // If buttons have appeared before, show them immediately and don't re-animate
-    if (hasButtonsAppeared) {
+    // If any hub is open, show all buttons immediately
+    if (isNavigationHubOpen || isScopeOpen || isOracleHubOpen) {
       setVisibleButtons([0, 1, 2, 3]);
       return;
     }
 
-    // If any hub is open, show all buttons immediately but don't mark as appeared
-    if (isNavigationHubOpen || isScopeOpen || isOracleHubOpen) {
+    // If buttons have appeared before, show them immediately
+    if (hasButtonsAppeared) {
       setVisibleButtons([0, 1, 2, 3]);
       return;
     }
@@ -188,7 +188,7 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
       <div className="fixed inset-0 z-[30] pointer-events-none radial-video-buttons">
         <div 
           className={`absolute top-1/2 -translate-y-1/2 pointer-events-auto transition-all duration-500 ease-out rotating-container ${
-            isOracleHubOpen || isScopeOpen ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            isOracleHubOpen ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
           }`}
           style={{
             left: '75%',
@@ -198,7 +198,7 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
           {BUTTONS.map(({ pos, color, alt, onClick }, index) => (
             <div
               key={pos}
-              className="absolute w-20 h-20 rounded-full pointer-events-auto overflow-hidden webm-button"
+              className="absolute w-20 h-20 rounded-full pointer-events-auto cursor-pointer overflow-hidden webm-button"
               style={{
                 left: pos === "left" ? "-420px" : pos === "right" ? "420px" : "0px",
                 top: pos === "top" ? "-420px" : pos === "bottom" ? "420px" : "0px",

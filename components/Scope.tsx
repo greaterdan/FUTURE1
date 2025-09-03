@@ -7,6 +7,33 @@ import ImageWithFallback from './ImageWithFallback';
 import SocialBadges from './SocialBadges';
 import HoverImagePreview from './HoverImagePreview';
 
+// Typing Indicator Component
+const TypingIndicator: React.FC<{ isTyping: boolean; companionName?: string }> = ({ isTyping, companionName }) => {
+  if (!isTyping) return null;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      className="flex mb-3 text-base leading-relaxed justify-start"
+    >
+      <div className="bg-gray-800 text-gray-200 p-3 rounded-lg max-w-[75%]">
+        <div className="flex items-end gap-2">
+          <span className="px-3 py-2 rounded-lg bg-gray-700 text-gray-200 text-sm font-medium">
+            {companionName ? `${companionName} is typing` : 'Companion is typing'}
+          </span>
+          <div className="flex items-end space-x-1">
+            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></span>
+            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce delay-150"></span>
+            <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce delay-300"></span>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
 // Visibility tracking hook for performance optimization
 export function useVisibility(mint: string, visibleMintsRef: React.MutableRefObject<Set<string>>) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -26,8 +53,13 @@ export function useVisibility(mint: string, visibleMintsRef: React.MutableRefObj
 }
 
 // Memoized TokenCard for performance
-type CardProps = { token: any; visibleMintsRef: React.MutableRefObject<Set<string>> };
-const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef }) => {
+type CardProps = { 
+  token: any; 
+  visibleMintsRef: React.MutableRefObject<Set<string>>;
+  onCompanionAttached?: (companionName: string, token: any) => void;
+  agents: Array<{ name: string; videoFile: string }>;
+};
+const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
   const [isDragOver, setIsDragOver] = useState(false);
   const [attachedCompanion, setAttachedCompanion] = useState<string | null>(null);
@@ -42,6 +74,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    console.log('Drag over token:', token.mint);
     // Completely disable drag over if companion is already attached
     if (attachedCompanion) {
       return;
@@ -58,6 +91,9 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
     e.preventDefault();
     setIsDragOver(false);
     
+    console.log('Drop event on token:', token.mint);
+    console.log('Data transfer types:', e.dataTransfer.types);
+    
     // Prevent dropping if a companion is already attached
     if (attachedCompanion) {
       console.log(`Token ${token.mint} already has companion ${attachedCompanion} attached`);
@@ -65,6 +101,8 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
     }
     
     const agentName = e.dataTransfer.getData('text/plain');
+    console.log('Agent name from drop:', agentName);
+    
     if (agentName) {
       console.log(`Agent ${agentName} dropped on token ${token.mint}`);
       
@@ -83,6 +121,13 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
       // Here you can add logic to handle the agent-token interaction
       // For example, open chat with the agent analyzing this specific token
       // You could emit an event or call a callback to open the chat panel
+      
+      // Notify parent component about companion attachment
+      if (onCompanionAttached) {
+        onCompanionAttached(agentName, token);
+      }
+    } else {
+      console.log('No agent name found in drop data');
     }
   };
   
@@ -98,9 +143,9 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
       className={`relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-105 hover:z-10 transition-all duration-200 token-card ${
         isDragOver && !attachedCompanion
           ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]' 
-          : 'border-white/10 bg-white/5'
+          : 'border-white/10 bg-white/6'
       }`}
-      style={{ willChange: 'transform' }}
+      style={{ willChange: 'transform', pointerEvents: 'auto' }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -129,10 +174,35 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
           animate={{ opacity: 1, scale: 1 }}
           className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-20"
         >
-          <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-lg border border-white/30 flex items-center justify-center">
-            <span className="text-white text-xs font-bold">
-              {attachedCompanion.split(' ').map(word => word[0]).join('')}
-            </span>
+          <div className="w-12 h-12 rounded-full overflow-hidden bg-transparent companion-video">
+            {/* Find the agent video for this companion */}
+            {(() => {
+              const agent = agents.find(a => a.name === attachedCompanion);
+              return agent ? (
+                <video 
+                  className="w-full h-full object-cover"
+                  autoPlay 
+                  muted 
+                  loop
+                  playsInline
+                  style={{ 
+                    mixBlendMode: 'screen',
+                    filter: 'brightness(1.2) contrast(1.1)',
+                    background: 'transparent',
+                    backgroundColor: 'transparent',
+                    backgroundImage: 'none'
+                  }}
+                >
+                  <source src={agent.videoFile} type="video/webm" />
+                </video>
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
+                  <span className="text-white font-bold text-xs">
+                    {attachedCompanion.split(' ').map(word => word[0]).join('')}
+                  </span>
+                </div>
+              );
+            })()}
           </div>
         </motion.div>
       )}
@@ -232,19 +302,23 @@ function TokenColumn({
   title, 
   items, 
   className = "",
-  visibleMintsRef
+  visibleMintsRef,
+  onCompanionAttached,
+  agents
 }: { 
   title: string; 
   items: any[]; 
   className?: string;
   visibleMintsRef: React.MutableRefObject<Set<string>>;
+  onCompanionAttached?: (companionName: string, token: any) => void;
+  agents: Array<{ name: string; videoFile: string }>;
 }) {
 
   return (
     <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 cursor-default ${className}`}>
       <h2 className="text-white text-lg font-bold text-center flex-shrink-0">{title}</h2>
       <div className="w-full border-b border-gray-700 mb-3 -mx-3" />
-      <div className="rounded-2xl bg-black/20 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6 cursor-default">
+      <div className="rounded-2xl bg-black/15 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6 cursor-default">
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="text-center text-white/40 py-8">
@@ -261,6 +335,8 @@ function TokenColumn({
                   <TokenCard 
                     token={token} 
                     visibleMintsRef={visibleMintsRef} 
+                    onCompanionAttached={onCompanionAttached}
+                    agents={agents}
                   />
                 </div>
               ))}
@@ -302,6 +378,29 @@ export const Scope = ({
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<Array<{ type: 'user' | 'assistant'; content: string; timestamp: Date }>>([]);
   const [inputMessage, setInputMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [typingCompanion, setTypingCompanion] = useState<string | null>(null);
+  
+  // Settings state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsView, setSettingsView] = useState<'menu' | 'api' | 'history'>('menu');
+  const [selectedAPI, setSelectedAPI] = useState('grok4');
+  const [apiKeys, setApiKeys] = useState({
+    grok4: '',
+    gemini: '',
+    perplexity: '',
+    chatgpt: ''
+  });
+  const [showApiKeyPopup, setShowApiKeyPopup] = useState(false);
+  const [editingApiKey, setEditingApiKey] = useState('');
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [conversationHistory, setConversationHistory] = useState<Array<{
+    id: string;
+    title: string;
+    messages: Array<{ type: 'user' | 'assistant'; content: string; timestamp: Date }>;
+    timestamp: Date;
+    summary?: string;
+  }>>([]);
 
   // AI Agents state
   const [hoveredAgent, setHoveredAgent] = useState<any>(null);
@@ -310,6 +409,35 @@ export const Scope = ({
   // Chat resize state
   const [chatWidth, setChatWidth] = useState(450);
   const [isResizing, setIsResizing] = useState(false);
+
+  // Load conversations from localStorage on component mount
+  useEffect(() => {
+    const savedConversations = localStorage.getItem('scope_conversations');
+    if (savedConversations) {
+      try {
+        const parsed = JSON.parse(savedConversations);
+        // Convert timestamp strings back to Date objects
+        const conversationsWithDates = parsed.map((conv: any) => ({
+          ...conv,
+          timestamp: new Date(conv.timestamp),
+          messages: conv.messages.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }))
+        }));
+        setConversationHistory(conversationsWithDates);
+      } catch (error) {
+        console.error('Failed to load conversations from localStorage:', error);
+      }
+    }
+  }, []);
+
+  // Save conversations to localStorage whenever they change
+  useEffect(() => {
+    if (conversationHistory.length > 0) {
+      localStorage.setItem('scope_conversations', JSON.stringify(conversationHistory));
+    }
+  }, [conversationHistory]);
 
   // Auto-close chat when Scope closes
   useEffect(() => {
@@ -359,59 +487,33 @@ export const Scope = ({
     }
   }, [isResizing, handleResizeMove, handleResizeEnd]);
 
-  // Cleanup function for drag previews
-  const cleanupDragPreviews = useCallback(() => {
-    // Clean up by data attribute first (most reliable)
-    const dragPreviews = document.querySelectorAll('[data-drag-preview="true"]');
-    dragPreviews.forEach(preview => {
-      if (preview.parentNode) {
-        preview.parentNode.removeChild(preview);
-      }
-    });
-    
-    // Fallback cleanup for any remaining previews
-    const previews = document.querySelectorAll('[style*="pointer-events-none"], [style*="left: -9999px"]');
-    previews.forEach(preview => {
-      if (preview.parentNode) {
-        preview.parentNode.removeChild(preview);
-      }
-    });
-  }, []);
 
-  // Clean up drag previews when component unmounts or when Scope closes
-  useEffect(() => {
-    return () => {
-      cleanupDragPreviews();
-    };
-  }, [cleanupDragPreviews]);
 
-  // Also clean up on window blur (when user switches tabs or drag is interrupted)
-  useEffect(() => {
-    const handleWindowBlur = () => {
-      cleanupDragPreviews();
-    };
 
-    window.addEventListener('blur', handleWindowBlur);
-    return () => window.removeEventListener('blur', handleWindowBlur);
-  }, [cleanupDragPreviews]);
 
-  // AI Agents data
+
+
+  // AI Agents data - Now using WIZZARD WebM video files
   const agents = [
     {
       name: "The Analyzer",
-      description: "Breaks down every token's anatomy: market cap, liquidity depth, holder distribution, wallet flows, and trading frequency — exposing both strength and weakness."
+      description: "Breaks down every token's anatomy: market cap, liquidity depth, holder distribution, wallet flows, and trading frequency — exposing both strength and weakness.",
+      videoFile: "/WIZZARD/MagicWizardSphere01_Blue.webm"
     },
     {
       name: "The Predictor",
-      description: "Uses historical patterns, momentum curves, and volatility signals to forecast where the market is likely to push a token next."
+      description: "Uses historical patterns, momentum curves, and volatility signals to forecast where the market is likely to push a token next.",
+      videoFile: "/WIZZARD/MagicWizardSphere01_Green.webm"
     },
     {
       name: "The Quantum Eraser",
-      description: "Removes misleading noise like spoofed trades, bot spam, and fake liquidity — reconstructing a clean version of the token's true history."
+      description: "Removes misleading noise like spoofed trades, bot spam, and fake liquidity — reconstructing a clean version of the token's true history.",
+      videoFile: "/WIZZARD/MagicWizardSphere01_Orange.webm"
     },
     {
       name: "The Retrocasual",
-      description: "Simulates future scenarios, then feeds those echoes back into the present — letting potential outcomes reshape today's analysis."
+      description: "Simulates future scenarios, then feeds those echoes back into the present — letting potential outcomes reshape today's analysis.",
+      videoFile: "/WIZZARD/MagicWizardSphere01_IceBlue.webm"
     }
   ];
 
@@ -460,20 +562,118 @@ export const Scope = ({
     return { newPairs, onEdge, filled, curveTokens };
   }, [tokens]);
 
+  // Generate smart conversation title based on content
+  const generateConversationTitle = useCallback((messages: Array<{ type: 'user' | 'assistant'; content: string; timestamp: Date }>) => {
+    if (messages.length === 0) return 'New Conversation';
+    
+    // Find the first user message to use as title
+    const firstUserMessage = messages.find(msg => msg.type === 'user');
+    if (firstUserMessage) {
+      const content = firstUserMessage.content;
+      // Create a smart title based on content
+      if (content.length <= 40) {
+        return content;
+      } else {
+        // Try to find a good break point
+        const words = content.split(' ');
+        let title = '';
+        for (const word of words) {
+          if ((title + ' ' + word).length <= 40) {
+            title += (title ? ' ' : '') + word;
+          } else {
+            break;
+          }
+        }
+        return title + (title.length < content.length ? '...' : '');
+      }
+    }
+    
+    return 'New Conversation';
+  }, []);
+
+
+
   // Chat functions - memoized to prevent recreation
   const sendMessage = useCallback(() => {
     if (!inputMessage.trim()) return;
     
     const userMessage = { type: 'user' as const, content: inputMessage, timestamp: new Date() };
-    setMessages(prev => [userMessage, ...prev]);
+    setMessages(prev => [...prev, userMessage]);
     setInputMessage('');
     
-    // Simulate assistant response
+    // Save conversation to history if it's a new conversation
+    if (messages.length === 0) {
+      const newConversation = {
+        id: Date.now().toString(),
+        title: generateConversationTitle([userMessage]),
+        messages: [userMessage],
+        timestamp: new Date()
+      };
+      setConversationHistory(prev => [newConversation, ...prev.slice(0, 19)]); // Keep last 20 conversations
+      setCurrentConversationId(newConversation.id);
+    } else {
+      // Update existing conversation with user message
+      if (currentConversationId) {
+        setConversationHistory(prev => {
+          const updated = [...prev];
+          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
+          
+          if (currentConvIndex !== -1) {
+            updated[currentConvIndex].messages = [...updated[currentConvIndex].messages, userMessage];
+          }
+          return updated;
+        });
+      }
+    }
+    
+    // Simulate companion typing
+    const randomCompanion = agents[Math.floor(Math.random() * agents.length)].name;
+    setTypingCompanion(randomCompanion);
+    setIsTyping(true);
+    
+    // Simulate typing duration based on message length and companion personality
+    const baseTypingTime = 1000; // Base 1 second
+    const charTypingTime = 50; // 50ms per character
+    const personalityDelay = Math.random() * 2000; // Random personality delay
+    const typingDuration = baseTypingTime + (inputMessage.length * charTypingTime) + personalityDelay;
+    
     setTimeout(() => {
-      const assistantMessage = { type: 'assistant' as const, content: 'I understand you\'re asking about: ' + inputMessage, timestamp: new Date() };
-      setMessages(prev => [assistantMessage, ...prev]);
-    }, 1000);
-  }, [inputMessage]);
+      setIsTyping(false);
+      setTypingCompanion(null);
+      
+      // Generate more realistic companion responses based on their role
+      let response = '';
+      if (randomCompanion === 'The Analyzer') {
+        response = `${randomCompanion}: I've analyzed "${inputMessage}" and found some interesting patterns. The market dynamics suggest...`;
+      } else if (randomCompanion === 'The Predictor') {
+        response = `${randomCompanion}: Based on "${inputMessage}", my prediction models indicate a potential trend shift. The momentum suggests...`;
+      } else if (randomCompanion === 'The Retrocasual') {
+        response = `${randomCompanion}: I've simulated future scenarios for "${inputMessage}" and the temporal echoes reveal...`;
+      } else {
+        response = `${randomCompanion}: I understand you're asking about: ${inputMessage}. Let me analyze this for you...`;
+      }
+      
+      const assistantMessage = { 
+        type: 'assistant' as const, 
+        content: response, 
+        timestamp: new Date() 
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Update conversation history with the companion response
+      if (currentConversationId) {
+        setConversationHistory(prev => {
+          const updated = [...prev];
+          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
+          
+          if (currentConvIndex !== -1) {
+            updated[currentConvIndex].messages = [...updated[currentConvIndex].messages, assistantMessage];
+          }
+          return updated;
+        });
+      }
+    }, typingDuration);
+  }, [inputMessage, messages.length, currentConversationId]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -486,14 +686,20 @@ export const Scope = ({
     e.preventDefault();
     e.stopPropagation();
     setInputMessage(e.target.value);
-  }, []);
+    
+    // Auto-close settings menu when user starts typing
+    if (isSettingsOpen) {
+      setIsSettingsOpen(false);
+      setSettingsView('menu');
+    }
+  }, [isSettingsOpen]);
 
-  // Auto-scroll to bottom when new messages arrive - ONLY when sending, not when typing
+  // Auto-scroll to bottom when new messages arrive
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    // Only auto-scroll when actually sending a message, not on every message change
-    if (messages.length > 0 && messages[0].type === 'user') {
+    // Auto-scroll to bottom when new messages arrive
+    if (messages.length > 0) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
@@ -661,24 +867,179 @@ export const Scope = ({
                 items={filteredTokens.newPairs} 
                 className="border-r border-gray-700 flex-1"
                 visibleMintsRef={visibleMintsRef}
+                agents={agents}
+                onCompanionAttached={(companionName, token) => {
+                  // Auto-open chat and simulate companion analysis
+                  if (!isChatOpen) {
+                    setIsChatOpen(true);
+                  }
+                  
+                  // Create new conversation for token analysis
+                  const newConversation = {
+                    id: Date.now().toString(),
+                    title: `${companionName} analyzing ${token.name || token.symbol || 'token'}`,
+                    messages: [],
+                    timestamp: new Date()
+                  };
+                  setConversationHistory(prev => [newConversation, ...prev.slice(0, 19)]);
+                  
+                  // Simulate companion analyzing the token
+                  setTimeout(() => {
+                    setTypingCompanion(companionName);
+                    setIsTyping(true);
+                    
+                    // Simulate analysis time
+                    const analysisTime = 3000 + Math.random() * 2000;
+                    
+                    setTimeout(() => {
+                      setIsTyping(false);
+                      setTypingCompanion(null);
+                      
+                      // Add analysis message
+                      const analysisMessage = {
+                        type: 'assistant' as const,
+                        content: `${companionName}: I've analyzed ${token.name || token.symbol || 'this token'}. Market cap: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'This is on a bonding curve - interesting dynamics ahead!' : 'Standard token with typical market behavior.'}`,
+                        timestamp: new Date()
+                      };
+                      setMessages(prev => [analysisMessage, ...prev]);
+                      
+                      // Update conversation history
+                      if (currentConversationId) {
+                        setConversationHistory(prev => {
+                          const updated = [...prev];
+                          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
+                          
+                          if (currentConvIndex !== -1) {
+                            updated[currentConvIndex].messages = [analysisMessage];
+                          }
+                          return updated;
+                        });
+                      }
+                    }, analysisTime);
+                  }, 500);
+                }}
               />
               <TokenColumn 
                 title="ON EDGE" 
                 items={filteredTokens.onEdge} 
                 className="border-r border-gray-700 flex-1"
                 visibleMintsRef={visibleMintsRef}
+                agents={agents}
+                onCompanionAttached={(companionName, token) => {
+                  // Auto-open chat and simulate companion analysis
+                  if (!isChatOpen) {
+                    setIsChatOpen(true);
+                  }
+                  
+                  // Create new conversation for token analysis
+                  const newConversation = {
+                    id: Date.now().toString(),
+                    title: `${companionName} analyzing ${token.name || token.symbol || 'token'}`,
+                    messages: [],
+                    timestamp: new Date()
+                  };
+                  setConversationHistory(prev => [newConversation, ...prev.slice(0, 19)]);
+                  setCurrentConversationId(newConversation.id);
+                  
+                  // Simulate companion analyzing the token
+                  setTimeout(() => {
+                    setTypingCompanion(companionName);
+                    setIsTyping(true);
+                    
+                    // Simulate analysis time
+                    const analysisTime = 3000 + Math.random() * 2000;
+                    
+                    setTimeout(() => {
+                      setIsTyping(false);
+                      setTypingCompanion(null);
+                      
+                      // Add analysis message
+                      const analysisMessage = {
+                        type: 'assistant' as const,
+                        content: `${companionName}: I've analyzed ${token.name || token.symbol || 'this token'}. Market cap: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'This is on a bonding curve - interesting dynamics ahead!' : 'Standard token with typical market behavior.'}`,
+                        timestamp: new Date()
+                      };
+                      setMessages(prev => [analysisMessage, ...prev]);
+                      
+                      // Update conversation history
+                      if (currentConversationId) {
+                        setConversationHistory(prev => {
+                          const updated = [...prev];
+                          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
+                          
+                          if (currentConvIndex !== -1) {
+                            updated[currentConvIndex].messages = [analysisMessage];
+                          }
+                          return updated;
+                        });
+                      }
+                    }, analysisTime);
+                  }, 500);
+                }}
               />
               <TokenColumn 
                 title="FILLED" 
                 items={filteredTokens.filled} 
                 className="flex-1"
                 visibleMintsRef={visibleMintsRef}
+                agents={agents}
+                onCompanionAttached={(companionName, token) => {
+                  // Auto-open chat and simulate companion analysis
+                  if (!isChatOpen) {
+                    setIsChatOpen(true);
+                  }
+                  
+                  // Create new conversation for token analysis
+                  const newConversation = {
+                    id: Date.now().toString(),
+                    title: `${companionName} analyzing ${token.name || token.symbol || 'token'}`,
+                    messages: [],
+                    timestamp: new Date()
+                  };
+                  setConversationHistory(prev => [newConversation, ...prev.slice(0, 19)]);
+                  setCurrentConversationId(newConversation.id);
+                  
+                  // Simulate companion analyzing the token
+                  setTimeout(() => {
+                    setTypingCompanion(companionName);
+                    setIsTyping(true);
+                    
+                    // Simulate analysis time
+                    const analysisTime = 3000 + Math.random() * 2000;
+                    
+                    setTimeout(() => {
+                      setIsTyping(false);
+                      setTypingCompanion(null);
+                      
+                      // Add analysis message
+                      const analysisMessage = {
+                        type: 'assistant' as const,
+                        content: `${companionName}: I've analyzed ${token.name || token.symbol || 'this token'}. Market cap: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'This is on a bonding curve - interesting dynamics ahead!' : 'Standard token with typical market behavior.'}`,
+                        timestamp: new Date()
+                      };
+                      setMessages(prev => [analysisMessage, ...prev]);
+                      
+                      // Update conversation history
+                      if (currentConversationId) {
+                        setConversationHistory(prev => {
+                          const updated = [...prev];
+                          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
+                          
+                          if (currentConvIndex !== -1) {
+                            updated[currentConvIndex].messages = [analysisMessage];
+                          }
+                          return updated;
+                        });
+                      }
+                    }, analysisTime);
+                  }, 500);
+                }}
               />
             </div>
             
             {/* Chat + Companions Panel - Absolute positioned for full height with smooth animation */}
             <div 
-              className={`bg-black/80 border-l border-gray-700 absolute right-0 bottom-0 h-full z-50 flex-shrink-0 ${
+              className={`bg-black/80 border-l border-gray-700 absolute right-0 bottom-0 h-full z-40 flex-shrink-0 ${
                 isChatOpen ? 'overflow-hidden' : 'w-0 overflow-hidden'
               }`}
               style={{
@@ -699,7 +1060,7 @@ export const Scope = ({
               )}
               <div className="h-full flex flex-col">
                 {/* Companions Section - Fixed height */}
-                <div className="p-4 border-b border-gray-700 flex-shrink-0">
+                <div className="p-4 border-b border-gray-700 flex-shrink-0" style={{ pointerEvents: 'auto' }}>
                   <div className="flex items-center justify-center mb-4">
                     <h2 className="text-xl font-bold text-white">Companions</h2>
                   </div>
@@ -709,49 +1070,41 @@ export const Scope = ({
                         <div
                           key={index}
                           draggable="true"
-                          className="relative w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-lg cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-blue-500/50"
+                          className="relative w-20 h-20 rounded-full cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110"
+                          style={{ background: 'transparent' }}
                           onMouseEnter={() => setHoveredAgent(agent)}
                           onMouseLeave={() => setHoveredAgent(null)}
                           onDragStart={(e) => {
+                            console.log('Drag started for:', agent.name);
                             e.dataTransfer.setData('text/plain', agent.name);
+                            e.dataTransfer.effectAllowed = 'copy';
                             
-                            // Create a custom drag preview that's bigger and animated
-                            const dragPreview = document.createElement('div');
-                            dragPreview.className = 'absolute pointer-events-none z-[100] bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full shadow-2xl border-2 border-white/20';
-                            dragPreview.setAttribute('data-drag-preview', 'true');
-                            dragPreview.style.width = '80px';
-                            dragPreview.style.height = '80px';
-                            dragPreview.style.left = '-9999px'; // Position off-screen
-                            dragPreview.style.top = '-9999px';
-                            dragPreview.style.transition = 'all 0.2s ease-out';
-                            
-                            // Add the agent initials
-                            dragPreview.innerHTML = `
-                              <div class="w-full h-full flex items-center justify-center text-white font-bold text-lg">
-                                ${agent.name.split(' ').map(word => word[0]).join('')}
-                              </div>
-                            `;
-                            
-                            document.body.appendChild(dragPreview);
-                            
-                            // Set the custom drag image
-                            e.dataTransfer.setDragImage(dragPreview, 40, 40);
-                            
-                            // Remove the preview immediately after drag image is set
-                            requestAnimationFrame(() => {
-                              if (document.body.contains(dragPreview)) {
-                                document.body.removeChild(dragPreview);
-                              }
-                            });
+                            // Simple visual feedback - just scale up
+                            (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)';
                           }}
                           onDragEnd={(e) => {
-                            // Use the centralized cleanup function
-                            cleanupDragPreviews();
+                            // Reset the scale
+                            (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
                           }}
                         >
-                          <div className="w-full h-full flex items-center justify-center text-white font-bold text-xs text-center leading-tight">
-                            {agent.name.split(' ').map(word => word[0]).join('')}
-                          </div>
+                          <video 
+                            className="w-full h-full object-cover pointer-events-none companion-video"
+                            autoPlay 
+                            muted 
+                            loop
+                            playsInline
+                            style={{ 
+                              mixBlendMode: 'screen',
+                              filter: 'brightness(1.2) contrast(1.1)',
+                              background: 'transparent',
+                              backgroundColor: 'transparent',
+                              backgroundImage: 'none',
+                              backgroundClip: 'content-box',
+                              isolation: 'isolate'
+                            }}
+                          >
+                            <source src={agent.videoFile} type="video/webm" />
+                          </video>
                         </div>
                       ))}
                     </div>
@@ -759,7 +1112,7 @@ export const Scope = ({
                 </div>
                 
                 {/* Messages Area - Expandable */}
-                <div className="flex-1 overflow-y-auto flex flex-col-reverse p-4 min-h-0 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto flex flex-col p-4 min-h-0 custom-scrollbar">
                   {messages.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                       <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
@@ -786,11 +1139,267 @@ export const Scope = ({
                           </div>
                         </div>
                       ))}
+                      
                       {/* Scroll anchor for auto-scroll */}
                       <div ref={messagesEndRef} />
+                      
+                      {/* Typing Indicator - Positioned at bottom */}
+                      <AnimatePresence>
+                        <TypingIndicator 
+                          isTyping={isTyping} 
+                          companionName={typingCompanion || undefined} 
+                        />
+                      </AnimatePresence>
                     </>
                   )}
                 </div>
+                
+                {/* API Key Popup */}
+                {showApiKeyPopup && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100]"
+                    onClick={() => setShowApiKeyPopup(false)}
+                  >
+                    <motion.div
+                      className="bg-gray-900 border border-gray-600 rounded-lg p-6 w-96 max-w-[90vw]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-white text-lg font-semibold capitalize">
+                          Configure {editingApiKey} API
+                        </h3>
+                        <button
+                          onClick={() => setShowApiKeyPopup(false)}
+                          className="text-gray-400 hover:text-white transition-colors"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      <div className="mb-4">
+                        <label className="text-gray-300 text-sm mb-2 block">API Key</label>
+                        <input
+                          type="password"
+                          value={apiKeys[editingApiKey as keyof typeof apiKeys]}
+                          onChange={(e) => setApiKeys(prev => ({ ...prev, [editingApiKey]: e.target.value }))}
+                          placeholder={`Enter your ${editingApiKey} API key`}
+                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => setShowApiKeyPopup(false)}
+                          className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded px-4 py-2 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedAPI(editingApiKey);
+                            setShowApiKeyPopup(false);
+                          }}
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 transition-colors"
+                        >
+                          Save & Select
+                        </button>
+                      </div>
+                    </motion.div>
+                  </motion.div>
+                )}
+                
+                {/* Settings Panel */}
+                {isSettingsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    className="w-full bg-black/90 border-t border-gray-700 p-4 flex-shrink-0"
+                  >
+                    {/* Main Menu View */}
+                    {settingsView === 'menu' && (
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="text-white text-lg font-semibold">Settings</h3>
+                          <button
+                            onClick={() => setIsSettingsOpen(false)}
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <button
+                            onClick={() => {
+                              setMessages([]);
+                              setInputMessage('');
+                              setCurrentConversationId(null);
+                              setIsSettingsOpen(false);
+                            }}
+                            className="w-full p-4 bg-blue-600/20 border border-blue-500/30 hover:border-blue-400/50 transition-colors text-left"
+                          >
+                            <div className="text-white text-lg font-medium">New Chat</div>
+                            <div className="text-blue-300 text-sm mt-1">Start a fresh conversation</div>
+                          </button>
+                          
+                          <button
+                            onClick={() => setSettingsView('api')}
+                            className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors text-left"
+                          >
+                            <div className="text-white text-lg font-medium">Companion API</div>
+                            <div className="text-gray-400 text-sm mt-1">Configure AI providers and API keys</div>
+                          </button>
+                          
+                          <button
+                            onClick={() => setSettingsView('history')}
+                            className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors text-left"
+                          >
+                            <div className="text-white text-lg font-medium">History</div>
+                            <div className="text-gray-400 text-sm mt-1">View and restore past conversations</div>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* API Configuration View */}
+                    {settingsView === 'api' && (
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => setSettingsView('menu')}
+                              className="text-gray-400 hover:text-white transition-colors"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                              </svg>
+                            </button>
+                            <h3 className="text-white text-lg font-semibold">Companion API</h3>
+                          </div>
+                          <button
+                            onClick={() => setIsSettingsOpen(false)}
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { key: 'grok4', name: 'Grok 4', default: true },
+                            { key: 'gemini', name: 'Gemini', default: false },
+                            { key: 'perplexity', name: 'Perplexity', default: false },
+                            { key: 'chatgpt', name: 'ChatGPT', default: false }
+                          ].map((api) => (
+                            <button
+                              key={api.key}
+                              onClick={() => {
+                                if (api.key === 'grok4') {
+                                  setSelectedAPI(api.key);
+                                } else {
+                                  setEditingApiKey(api.key);
+                                  setShowApiKeyPopup(true);
+                                }
+                              }}
+                              className={`p-3 rounded-lg border transition-all duration-200 ${
+                                selectedAPI === api.key
+                                  ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                                  : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                              }`}
+                            >
+                              <div className="text-sm font-medium">{api.name}</div>
+                              {api.default && (
+                                <div className="text-xs text-gray-400 mt-1">Default</div>
+                              )}
+                              {!api.default && (
+                                <div className="text-xs text-gray-400 mt-1">Click to configure</div>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* History View */}
+                    {settingsView === 'history' && (
+                      <div>
+                        <div className="flex justify-between items-center mb-4">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => setSettingsView('menu')}
+                              className="text-gray-400 hover:text-white transition-colors"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                              </svg>
+                            </button>
+                            <h3 className="text-white text-lg font-semibold">Conversation History</h3>
+                          </div>
+                          <button
+                            onClick={() => setIsSettingsOpen(false)}
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {conversationHistory.length === 0 ? (
+                            <div className="text-gray-400 text-sm text-center py-8">
+                              No conversations yet
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex justify-between items-center mb-3">
+                                <span className="text-gray-400 text-xs">
+                                  {conversationHistory.length} conversations
+                                </span>
+                                                                  <button
+                                    onClick={() => {
+                                      if (confirm('Clear all conversation history?')) {
+                                        setConversationHistory([]);
+                                        localStorage.removeItem('scope_conversations');
+                                      }
+                                    }}
+                                    className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                                  >
+                                    Clear All
+                                  </button>
+                              </div>
+                              {conversationHistory.map((conv) => (
+                                <button
+                                  key={conv.id}
+                                  onClick={() => {
+                                    setMessages(conv.messages);
+                                    setIsSettingsOpen(false);
+                                  }}
+                                  className="w-full text-left p-3 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors"
+                                >
+                                  <div className="text-white text-sm font-medium truncate">{conv.title}</div>
+                                  <div className="text-gray-400 text-xs mt-1">
+                                    {conv.timestamp.toLocaleDateString()} - {conv.messages.length} messages
+                                  </div>
+                                </button>
+                              ))}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
                 
                 {/* Input Area - Fixed at bottom with fixed height */}
                 <div className="w-full bg-black/70 border-t border-gray-700 p-2 flex items-center gap-2 flex-shrink-0 h-16 chat-input-container">
@@ -802,12 +1411,27 @@ export const Scope = ({
                     onFocus={(e) => e.preventDefault()}
                     onBlur={(e) => e.preventDefault()}
                     placeholder="Type your message..."
-                    className="flex-1 rounded-lg bg-gray-900 p-2 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 h-10"
+                    className="flex-1 rounded-lg bg-gray-900 p-1.5 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 h-9 ml-1"
                     style={{ scrollBehavior: 'auto' }}
                   />
                   <button
+                    onClick={() => {
+                      setIsSettingsOpen(!isSettingsOpen);
+                      if (!isSettingsOpen) {
+                        setSettingsView('menu');
+                      }
+                    }}
+                    className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3 py-1.5 h-9 transition-colors duration-200"
+                    title="Settings & History"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </button>
+                  <button
                     onClick={sendMessage}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 h-10"
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 h-9"
                   >
                     Send
                   </button>
@@ -825,3 +1449,4 @@ export const Scope = ({
 };
 
 export default Scope;
+
