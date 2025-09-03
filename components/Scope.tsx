@@ -43,7 +43,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, hot, visibleMint
       ref={cardRef}
       layout={!hot}
       transition={hot ? { duration: 0 } : { type: 'spring', stiffness: 140, damping: 18 }}
-      className="relative isolate overflow-visible rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm"
+      className="relative isolate overflow-visible rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm hover:scale-105 hover:z-10 transition-transform duration-200 token-card"
       style={{ willChange: 'transform' }}
     >
       {/* Header row: avatar, name/symbol, copy button */}
@@ -137,9 +137,9 @@ function TokenColumn({
 }) {
 
   return (
-    <div className={`flex flex-col gap-3 min-w-0 flex-1 ${className}`}>
+    <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 ${className}`}>
       <h2 className="text-white text-lg font-bold text-center flex-shrink-0">{title}</h2>
-      <div className="rounded-2xl bg-black/20 p-4 overflow-y-auto h-[calc(100vh-200px)] max-h-[calc(100vh-200px)]">
+      <div className="rounded-2xl bg-black/20 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-200px)] max-h-[calc(100vh-200px)]">
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="text-center text-white/40 py-8">
@@ -152,7 +152,9 @@ function TokenColumn({
                 {items.length} tokens
               </div>
               {items.map((token, index) => (
-                <TokenCard key={token.mint} token={token} hot={hot} visibleMintsRef={visibleMintsRef} />
+                <div key={token.mint} className="relative">
+                  <TokenCard token={token} hot={hot} visibleMintsRef={visibleMintsRef} />
+                </div>
               ))}
             </>
           )}
@@ -194,14 +196,42 @@ export const Scope = ({
   
   // Chat state
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [messages, setMessages] = useState<Array<{ type: 'user' | 'assistant'; content: string; timestamp: Date }>>([
-    { type: 'assistant', content: 'Hello! I\'m here to help you monitor the Solana blockchain.', timestamp: new Date() },
-    { type: 'user', content: 'Show me the latest new tokens', timestamp: new Date() },
-    { type: 'assistant', content: 'I can see 3 new tokens have been minted in the last hour. Check the "New Pairs" column for real-time updates!', timestamp: new Date() },
-    { type: 'user', content: 'What\'s the market sentiment?', timestamp: new Date() },
-    { type: 'assistant', content: 'Market activity is high today. I\'m monitoring 15+ new liquidity pools and seeing increased trading volume across all categories.', timestamp: new Date() }
-  ]);
+  const [messages, setMessages] = useState<Array<{ type: 'user' | 'assistant'; content: string; timestamp: Date }>>([]);
   const [inputMessage, setInputMessage] = useState('');
+
+  // AI Agents state
+  const [hoveredAgent, setHoveredAgent] = useState<any>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+
+  // AI Agents data
+  const agents = [
+    {
+      name: "The Analyzer",
+      description: "Breaks down every token's anatomy: market cap, liquidity depth, holder distribution, wallet flows, and trading frequency — exposing both strength and weakness."
+    },
+    {
+      name: "The Predictor",
+      description: "Uses historical patterns, momentum curves, and volatility signals to forecast where the market is likely to push a token next."
+    },
+    {
+      name: "The Quantum Eraser",
+      description: "Removes misleading noise like spoofed trades, bot spam, and fake liquidity — reconstructing a clean version of the token's true history."
+    },
+    {
+      name: "The Retrocasual",
+      description: "Simulates future scenarios, then feeds those echoes back into the present — letting potential outcomes reshape today's analysis."
+    }
+  ];
+
+  // Debug: Monitor tokens state changes
+  useEffect(() => {
+    console.log("🎯 SCOPE: Tokens state changed:", {
+      tokensLength: tokens?.length || 0,
+      isLoading,
+      connectionStatus,
+      lastUpdate: lastUpdate?.toLocaleTimeString()
+    });
+  }, [tokens, isLoading, connectionStatus, lastUpdate]);
 
   // Memoize filtered tokens to prevent recalculation on every render
   const filteredTokens = useMemo(() => {
@@ -211,11 +241,23 @@ export const Scope = ({
       return { newPairs: [], onEdge: [], filled: [] };
     }
     
+    // Debug: Log first few tokens to see their structure
+    console.log("🔍 Sample tokens:", tokens.slice(0, 3).map(t => ({
+      name: t.name,
+      symbol: t.symbol,
+      poolType: t.poolType
+    })));
+    
     const newPairs = tokens.filter(t => t && t.poolType === 'none');
     const onEdge = tokens.filter(t => t && t.poolType !== 'none' && t.poolType !== 'pumpfun');
     const filled = tokens.filter(t => t && t.poolType === 'pumpfun');
     
-    console.log("✅ Filtered tokens:", { newPairs: newPairs.length, onEdge: onEdge.length, filled: filled.length });
+    console.log("✅ Filtered tokens:", {
+      newPairs: newPairs.length,
+      onEdge: onEdge.length, 
+      filled: filled.length,
+      total: tokens.length
+    });
     return { newPairs, onEdge, filled };
   }, [tokens]);
 
@@ -285,41 +327,10 @@ export const Scope = ({
               <span className="text-sm font-medium">{isChatOpen ? 'Close Chat' : 'Chat'}</span>
             </button>
             
-            <div className="flex items-center space-x-4 text-sm">
-              <span className="text-white/60">Status: {connectionStatus}</span>
-              <span className="text-white/60">RPC: {currentRpc ? currentRpc.split('//')[1]?.split('/')[0] || 'Connecting...' : 'Connecting...'}</span>
-              <span className="text-white/60">Last Update: {lastUpdate?.toLocaleTimeString()}</span>
-            </div>
+
           </div>
           
-          <div className="flex items-center space-x-4">
-            {/* Live/Pause Controls */}
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={live ? pauseLive : resumeLive}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  live 
-                    ? 'bg-red-500 hover:bg-red-600 text-white' 
-                    : 'bg-green-500 hover:bg-green-600 text-white'
-                }`}
-              >
-                {live ? 'Pause' : 'Resume'} Live
-              </button>
-              {!live && pendingCount > 0 && (
-                <span className="bg-yellow-500 text-black px-2 py-1 rounded-full text-xs font-bold">
-                  +{pendingCount} new
-                </span>
-              )}
-            </div>
-            
-            {/* Stats */}
-            <div className="text-white text-sm">
-              <span className="text-white/60">Total: </span>
-              <span className="font-bold">{stats.totalTokens}</span>
-              <span className="text-white/60 ml-4">New: </span>
-              <span className="font-bold text-green-400">{stats.newTokens}</span>
-            </div>
-          </div>
+
         </div>
       </div>
 
@@ -378,55 +389,61 @@ export const Scope = ({
               <div className="h-full flex flex-col">
                 {/* Companions Section - Fixed height */}
                 <div className="p-4 border-b border-gray-700 flex-shrink-0">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-center mb-4">
                     <h2 className="text-xl font-bold text-white">Companions</h2>
-                    {/* Mobile close button */}
-                    <button
-                      onClick={() => setIsChatOpen(false)}
-                      className="lg:hidden p-2 text-white/60 hover:text-white"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        draggable="true"
-                        className="w-14 h-14 rounded-full bg-gradient-to-r from-purple-500 via-blue-500 to-pink-500 shadow-lg cursor-grab hover:scale-110 hover:shadow-purple-500/50 transition-all duration-200 mx-auto animate-pulse"
-                        style={{
-                          animationDelay: `${i * 0.2}s`,
-                          animationDuration: '2s'
-                        }}
-                      />
-                    ))}
+                  <div className="flex justify-center">
+                    <div className="flex gap-4">
+                      {agents.map((agent, index) => (
+                        <div
+                          key={index}
+                          className="relative w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-lg cursor-pointer overflow-hidden transition-all duration-300 hover:scale-110 hover:shadow-blue-500/50"
+                          onMouseEnter={() => setHoveredAgent(agent)}
+                          onMouseLeave={() => setHoveredAgent(null)}
+                        >
+                          <div className="w-full h-full flex items-center justify-center text-white font-bold text-xs text-center leading-tight">
+                            {agent.name.split(' ').map(word => word[0]).join('')}
+                          </div>
+                          
+
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 
                 {/* Messages Area - Expandable */}
                 <div className="flex-1 overflow-y-auto flex flex-col-reverse p-4 min-h-0 custom-scrollbar">
-                  {messages.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`flex mb-3 text-base leading-relaxed ${
-                        message.type === 'assistant' 
-                          ? 'justify-start' 
-                          : 'justify-end'
-                      }`}
-                    >
-                      <div className={`${
-                        message.type === 'assistant' 
-                          ? 'bg-gray-800 text-gray-200' 
-                          : 'bg-blue-600 text-white'
-                      } p-3 rounded-lg max-w-[75%]`}>
-                        {message.content}
+                  {messages.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
+                        Drag a companion onto a token, pick a companion, or start typing to begin…
                       </div>
                     </div>
-                  ))}
-                  {/* Scroll anchor for auto-scroll */}
-                  <div ref={messagesEndRef} />
+                  ) : (
+                    <>
+                      {messages.map((message, index) => (
+                        <div
+                          key={index}
+                          className={`flex mb-3 text-base leading-relaxed ${
+                            message.type === 'assistant' 
+                              ? 'justify-start' 
+                              : 'justify-end'
+                          }`}
+                        >
+                          <div className={`${
+                            message.type === 'assistant' 
+                              ? 'bg-gray-800 text-gray-200' 
+                              : 'bg-blue-600 text-white'
+                          } p-3 rounded-lg max-w-[75%]`}>
+                            {message.content}
+                          </div>
+                        </div>
+                      ))}
+                      {/* Scroll anchor for auto-scroll */}
+                      <div ref={messagesEndRef} />
+                    </>
+                  )}
                 </div>
                 
                 {/* Input Area - Fixed at bottom with fixed height */}
@@ -454,6 +471,8 @@ export const Scope = ({
           </div>
         )}
       </div>
+
+
     </div>
   );
 };
