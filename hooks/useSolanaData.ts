@@ -208,17 +208,29 @@ export const useSolanaData = (isOpen: boolean) => {
         links: { explorer: `https://solscan.io/token/${mint}` },
       };
 
+      // Update both local and global state
       setTokens(prev => {
         if (prev.some(t => t.mint === mint)) return prev;
-        return [newToken, ...prev].slice(0, 1000);
+        const newTokens = [newToken, ...prev].slice(0, 1000);
+        // Also update global state
+        globalTokens = newTokens;
+        console.log(`🔄 Updated tokens state: ${newTokens.length} total tokens`);
+        return newTokens;
       });
 
       mintCreatedAtRef.current.set(mint, Date.now());
-      setStats(prev => ({
-        ...prev,
-        totalTokens: prev.totalTokens + 1,
-        newTokens: prev.newTokens + 1,
-      }));
+      
+      // Update both local and global stats
+      const newStats = {
+        totalTokens: stats.totalTokens + 1,
+        newTokens: stats.newTokens + 1,
+        activeTokens: stats.activeTokens,
+        totalVolume: stats.totalVolume,
+        totalLiquidity: stats.totalLiquidity,
+      };
+      
+      setStats(newStats);
+      globalStats = newStats;
 
       console.log(`✅ Mint + metadata: ${newToken.name} (${newToken.symbol})`);
     } catch (error) {
@@ -327,10 +339,48 @@ export const useSolanaData = (isOpen: boolean) => {
   //   activeSubscriptions.current.clear();
   // }, []);
 
+  // Load existing tokens from recent transactions
+  const loadExistingTokens = useCallback(async () => {
+    if (!connectionRef.current) return;
+    
+    try {
+      console.log("🔍 Loading existing tokens from recent transactions...");
+      
+      // Get recent signatures for the token program
+      const signatures = await connectionRef.current.getSignaturesForAddress(
+        new PublicKey(TOKEN_PROGRAM_ID),
+        { limit: 50 }
+      );
+      
+      console.log(`📝 Found ${signatures.length} recent token transactions`);
+      
+      // Process the first 10 signatures to get some initial tokens
+      for (let i = 0; i < Math.min(10, signatures.length); i++) {
+        const sig = signatures[i];
+        try {
+          const mintAddress = await findMintFromInitMint(sig.signature);
+          if (mintAddress && !seenMints.current.has(mintAddress)) {
+            await processNewToken(mintAddress, sig.signature);
+          }
+        } catch (error) {
+          console.warn(`Failed to process signature ${sig.signature}:`, error);
+        }
+      }
+      
+      console.log("✅ Finished loading existing tokens");
+    } catch (error) {
+      console.error("❌ Failed to load existing tokens:", error);
+    }
+  }, [findMintFromInitMint, processNewToken]);
+
   // 4) Start the stream once and keep it running
   useEffect(() => {
     // Start the stream immediately and keep it running
-    const t = setTimeout(() => { startSolanaDataStream(); }, 200);
+    const t = setTimeout(() => { 
+      startSolanaDataStream();
+      // Also load existing tokens after a short delay
+      setTimeout(() => loadExistingTokens(), 1000);
+    }, 200);
     
     // NEVER cleanup the connection - keep it running forever
     // return () => { clearTimeout(t); };
@@ -340,7 +390,7 @@ export const useSolanaData = (isOpen: boolean) => {
       clearTimeout(t); 
       // DO NOT cleanup subscriptions or connection
     };
-  }, [startSolanaDataStream]); // Remove isOpen dependency
+  }, [startSolanaDataStream, loadExistingTokens]); // Add loadExistingTokens dependency
 
   // Resume live updates
   const resumeLive = useCallback(() => {
