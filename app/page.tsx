@@ -2,7 +2,8 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { useSolanaData } from "@/hooks/useSolanaData";
+import { useServerData } from "@/hooks/useServerData";
+
 
 // Dynamically import all components to avoid SSR issues
 const BackgroundVideo = dynamic(() => import("@/components/BackgroundVideo"), { ssr: false });
@@ -23,6 +24,7 @@ export default function Page() {
   const [isScopeOpen, setIsScopeOpen] = useState(false);
   const [isOracleHubOpen, setIsOracleHubOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [cornerLogoVisible, setCornerLogoVisible] = useState(true);
 
   // Solana monitoring - runs continuously regardless of Scope state
   const {
@@ -31,13 +33,16 @@ export default function Page() {
     lastUpdate,
     stats,
     connectionStatus,
-    currentRpc,
-    hot,
     live,
-    pendingCount,
     resumeLive,
     pauseLive,
-  } = useSolanaData(true); // Always true to keep monitoring active
+    searchTokens,
+    filterByStatus,
+    filterBySource,
+    refresh,
+  } = useServerData(true); // Always true - monitoring NEVER stops, regardless of Scope state
+
+
 
   // Debug logging for state changes
   useEffect(() => {
@@ -45,9 +50,25 @@ export default function Page() {
     
     // Additional debug info
     if (isScopeOpen) {
-      console.log("🎯 SCOPE IS NOW OPEN - This should trigger useSolanaData to start monitoring");
+      console.log("🎯 SCOPE IS NOW OPEN - useServerData continues monitoring (always active)");
     } else {
-      console.log("🎯 SCOPE IS NOW CLOSED - useSolanaData should stop monitoring");
+      console.log("🎯 SCOPE IS NOW CLOSED - useServerData continues monitoring (always active)");
+    }
+  }, [isScopeOpen, isNavigationHubOpen, isOracleHubOpen]);
+
+  // Smooth CornerLogo visibility transitions
+  useEffect(() => {
+    const shouldBeVisible = !isScopeOpen && !isNavigationHubOpen && !isOracleHubOpen;
+    
+    if (shouldBeVisible) {
+      // Show immediately when closing hubs
+      setCornerLogoVisible(true);
+    } else {
+      // Small delay when opening hubs to prevent flash
+      const timer = setTimeout(() => {
+        setCornerLogoVisible(false);
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [isScopeOpen, isNavigationHubOpen, isOracleHubOpen]);
 
@@ -154,7 +175,7 @@ export default function Page() {
         <BackgroundVideo isOracleOpen={isOracleHubOpen} />
         <RetroGeometry isSlow={isNavigationHubOpen} isOracleOpen={isOracleHubOpen} />
         {!isOracleHubOpen && <LeftTypewriter />}
-        <CornerLogo size={64} isVisible={!isScopeOpen && !isNavigationHubOpen && !isOracleHubOpen} />
+        <CornerLogo size={64} isVisible={cornerLogoVisible} />
         <RadialVideoButtons 
           isNavigationHubOpen={isNavigationHubOpen}
           setIsNavigationHubOpen={saveNavigationState}
@@ -173,13 +194,13 @@ export default function Page() {
           lastUpdate={lastUpdate}
           stats={stats}
           connectionStatus={connectionStatus}
-          currentRpc={currentRpc}
-          hot={hot}
           live={live}
-          pendingCount={pendingCount}
           resumeLive={resumeLive}
           pauseLive={pauseLive}
+          onClose={() => saveScopeState(false)}
         />
+        
+
       </main>
     </ErrorBoundary>
   );

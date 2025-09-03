@@ -28,7 +28,7 @@ export default function HoverImagePreview({
     let x = clientX + pad;
     let y = clientY + pad;
     const vw = window.innerWidth, vh = window.innerHeight;
-    const w = 250, h = 250; // rough bounds incl. padding (reduced from 500)
+    const w = 272, h = 272; // Fixed size: 240px + 16px padding on each side
     if (x + w > vw) x = vw - w - pad;
     if (y + h > vh) y = vh - h - pad;
     setPos({ x, y });
@@ -46,7 +46,7 @@ export default function HoverImagePreview({
       <img
         src={src}
         alt={alt}
-        className="max-w-[240px] max-h-[240px] object-contain rounded-lg"
+        className="w-[240px] h-[240px] object-cover rounded-lg"
         draggable={false}
       />
     </div>,

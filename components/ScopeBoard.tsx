@@ -42,10 +42,10 @@ export default function ScopeBoard() {
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div className="text-white p-6" style={{ fontFamily: 'VT323, monospace' }}>Loading Scope...</div>;
+  if (loading) return <div className="text-white p-6">Loading Scope...</div>;
 
   if (!Array.isArray(tokens)) {
-    return <div className="text-white p-6" style={{ fontFamily: 'VT323, monospace' }}>Error loading tokens</div>;
+    return <div className="text-white p-6">Error loading tokens</div>;
   }
 
   const newPairs = tokens.filter((t) => t.status === "new");
@@ -64,7 +64,7 @@ export default function ScopeBoard() {
 function TokenColumn({ title, tokens }: { title: string; tokens: TokenData[] }) {
   return (
     <div className="bg-black/40 rounded-lg p-4 border border-white/10">
-      <h2 className="text-lg font-bold mb-4 text-white" style={{ fontFamily: 'VT323, monospace' }}>{title}</h2>
+      <h2 className="text-lg font-bold mb-4 text-white">{title}</h2>
       <div className="space-y-3">
         {tokens.map((t) => (
           <div

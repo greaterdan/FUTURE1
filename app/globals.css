@@ -89,6 +89,8 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
   overflow: hidden !important;
 }
 
+
+
 /* Prevent layout shifts and page movement */
 .scope-container {
   position: fixed !important;
@@ -98,6 +100,27 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
   bottom: 0 !important;
   overflow: hidden !important;
 }
+
+/* Companion drag animations */
+.scope-container .scale-125 {
+  transform: scale(1.25) !important;
+  z-index: 50 !important;
+  transition: transform 0.2s ease-out !important;
+}
+
+/* Ensure hovered cards appear above other content */
+.scope-container .token-card:hover {
+  z-index: 10 !important;
+  transform: scale(1.05) !important;
+}
+
+/* Ensure proper stacking context for columns */
+.scope-container .token-column {
+  position: relative !important;
+  z-index: 0 !important;
+}
+
+
 
 /* Prevent input focus from causing layout shifts */
 .scope-container input:focus {
@@ -110,6 +133,50 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
   height: 64px !important;
   min-height: 64px !important;
   max-height: 64px !important;
+}
+
+/* Prevent jumping and ensure smooth webm button animations */
+.radial-video-buttons {
+  will-change: transform;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+.radial-video-buttons * {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+}
+
+/* Smooth hover transitions */
+.radial-video-buttons button,
+.radial-video-buttons div {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Prevent transform conflicts */
+.radial-video-buttons .rotating-container {
+  transform-style: preserve-3d;
+  perspective: 1000px;
+}
+
+/* Ultra-smooth webm button animations */
+.radial-video-buttons .webm-button {
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  will-change: transform, opacity, filter;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Prevent any jumping during hover */
+.radial-video-buttons .webm-button:hover {
+  transform: scale(1.02) translateZ(0);
+}
+
+/* Smooth rotation container */
+.radial-video-buttons .rotating-container {
+  transition: transform 0.1s linear;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 @media (prefers-color-scheme: dark) {

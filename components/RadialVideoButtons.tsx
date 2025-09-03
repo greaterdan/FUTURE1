@@ -24,6 +24,53 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
   const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [hasButtonsAppeared, setHasButtonsAppeared] = useState(false);
 
+  // Smooth hover handling without jumping
+  const handleMouseEnter = (pos: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Set hover state immediately but smoothly
+    setHoveredButton(pos);
+    setMousePosition({ x: e.clientX, y: e.clientY });
+    
+    // Pause rotation smoothly
+    setIsRotationPaused(true);
+    
+    // Clear any existing timeout
+    if (pauseTimeoutRef.current) {
+      clearTimeout(pauseTimeoutRef.current);
+    }
+  };
+
+  const handleMouseLeave = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Clear hover state immediately
+    setHoveredButton(null);
+    
+    // Resume rotation with minimal delay
+    pauseTimeoutRef.current = setTimeout(() => {
+      setIsRotationPaused(false);
+    }, 50); // Very short delay to prevent interference
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Only update position if hovering and moved significantly
+    if (hoveredButton) {
+      setMousePosition(prev => {
+        const deltaX = Math.abs(e.clientX - prev.x);
+        const deltaY = Math.abs(e.clientY - prev.y);
+        
+        // Only update if mouse moved significantly to prevent micro-jumps
+        if (deltaX > 5 || deltaY > 5) {
+          return { x: e.clientX, y: e.clientY };
+        }
+        return prev;
+      });
+    }
+  };
+
   const BUTTONS = [
     { pos: "top",    color: "#FF6B6B", alt: "Top",    onClick: () => setIsNavigationHubOpen(true), video: "/1.webm" },
     { pos: "right",  color: "#4ECDC4", alt: "Right",  onClick: () => console.log("Right"), video: "/2.webm" },
@@ -112,12 +159,12 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
     // Start rotation immediately when zoom finishes (when first button appears)
     if (visibleButtons.length > 0) {
       const animate = () => {
-        // Only rotate when not paused and not hovering
-        if (!isRotationPaused && !hoveredButton) {
+        // Only rotate when not paused
+        if (!isRotationPaused) {
           // Adjust speed based on which hub is open
-          let speed = -0.5; // default speed
-          if (isNavigationHubOpen) speed = -0.2; // slower when navigation hub open
-          if (isOracleHubOpen) speed = -0.3; // medium speed when oracle hub open
+          let speed = -0.3; // Slower, smoother speed
+          if (isNavigationHubOpen) speed = -0.15;
+          if (isOracleHubOpen) speed = -0.2;
           
           setRotation(prev => prev + speed);
         }
@@ -132,13 +179,13 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
         }
       };
     }
-  }, [visibleButtons.length, isNavigationHubOpen, isOracleHubOpen, hoveredButton, isRotationPaused]);
+  }, [visibleButtons.length, isNavigationHubOpen, isOracleHubOpen, isRotationPaused]);
 
   return (
     <>
-      <div className="fixed inset-0 z-[30] pointer-events-none">
+      <div className="fixed inset-0 z-[30] pointer-events-none radial-video-buttons">
         <div 
-          className={`absolute top-1/2 -translate-y-1/2 pointer-events-auto transition-all duration-700 ease-in-out ${
+          className={`absolute top-1/2 -translate-y-1/2 pointer-events-auto transition-all duration-500 ease-out rotating-container ${
             isOracleHubOpen ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
           }`}
           style={{
@@ -149,7 +196,7 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
           {BUTTONS.map(({ pos, color, alt, onClick }, index) => (
             <div
               key={pos}
-              className="absolute w-20 h-20 rounded-full pointer-events-auto cursor-pointer overflow-hidden transition-opacity duration-500"
+              className="absolute w-20 h-20 rounded-full pointer-events-auto cursor-pointer overflow-hidden webm-button"
               style={{
                 left: pos === "left" ? "-420px" : pos === "right" ? "420px" : "0px",
                 top: pos === "top" ? "-420px" : pos === "bottom" ? "420px" : "0px",
@@ -161,35 +208,17 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
                 e.stopPropagation();
                 onClick();
               }}
-              onMouseEnter={(e) => {
-                e.stopPropagation();
-                setHoveredButton(pos);
-                setMousePosition({ x: e.clientX, y: e.clientY });
-                setIsRotationPaused(true);
-                // Clear any existing timeout
-                if (pauseTimeoutRef.current) {
-                  clearTimeout(pauseTimeoutRef.current);
-                }
-              }}
-              onMouseMove={(e) => {
-                e.stopPropagation();
-                if (hoveredButton === pos) {
-                  setMousePosition({ x: e.clientX, y: e.clientY });
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.stopPropagation();
-                setHoveredButton(null);
-                // Add a delay before resuming rotation to prevent interference
-                pauseTimeoutRef.current = setTimeout(() => {
-                  setIsRotationPaused(false);
-                }, 300); // 300ms delay
-              }}
+              onMouseEnter={(e) => handleMouseEnter(pos, e)}
+              onMouseMove={(e) => handleMouseMove(e)}
+              onMouseLeave={(e) => handleMouseLeave(e)}
             >
               <div 
-                className="w-full h-full rounded-full overflow-hidden"
+                className="w-full h-full rounded-full overflow-hidden transition-all duration-300 ease-out"
                 style={{ 
-                  animation: 'pulse 2s infinite'
+                  animation: 'pulse 2s infinite',
+                  opacity: hoveredButton === pos ? 1 : 0.85,
+                  filter: hoveredButton === pos ? 'brightness(1.3) saturate(1.1)' : 'brightness(1) saturate(1)',
+                  transform: hoveredButton === pos ? 'scale(1.02)' : 'scale(1)',
                 }}
               >
                 <video

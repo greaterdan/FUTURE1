@@ -72,7 +72,7 @@ export default function LeftTypewriter() {
     <div
       className="
         pointer-events-none select-none
-        fixed left-[15vw] md:left-[20vw] top-1/2 -translate-y-1/2 z-50
+        fixed left-[20vw] md:left-[25vw] top-1/2 -translate-y-1/2 z-50
         max-w-[44ch] text-left
       "
       style={{

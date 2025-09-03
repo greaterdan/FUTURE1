@@ -2,11 +2,6 @@ import { Globe, Send, Gamepad2, Flame, BarChart3, Landmark, ExternalLink, X } fr
 
 type Props = { 
   links?: {
-    website?: string;
-    twitter?: string;
-    telegram?: string;
-    discord?: string;
-    pumpfun?: string;
     dexscreener?: string;
     jupiter?: string;
     explorer?: string;
@@ -46,11 +41,6 @@ export default function SocialBadges({ links }: Props) {
   // This ensures they appear immediately on page load
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      <A href={links?.website}     title="Website"><Globe size={14} className="text-white/80" /></A>
-      <A href={links?.twitter}     title="X (Twitter)"><X size={14} className="text-white/80" /></A>
-      <A href={links?.telegram}    title="Telegram"><Send size={14} className="text-white/80" /></A>
-      <A href={links?.discord}     title="Discord"><Gamepad2 size={14} className="text-white/80" /></A>
-      <A href={links?.pumpfun}     title="Pump.fun"><Flame size={14} className="text-white/80" /></A>
       <A href={links?.dexscreener} title="DexScreener"><BarChart3 size={14} className="text-white/80" /></A>
       <A href={links?.explorer}    title="Solscan"><Landmark size={14} className="text-white/80" /></A>
       <A href={links?.jupiter}     title="Trade on Jupiter"><ExternalLink size={14} className="text-white/80" /></A>

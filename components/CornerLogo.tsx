@@ -168,7 +168,7 @@ export default function CornerLogo({ size = 64, isVisible = true }: CornerLogoPr
   return (
     <div
       ref={hostRef}
-      className={`fixed top-4 left-4 z-[80] pointer-events-none transition-opacity duration-700 ease-in-out ${
+      className={`corner-logo fixed top-6 left-6 z-[40] pointer-events-none transition-opacity duration-300 ease-in-out ${
         isVisible ? 'opacity-100' : 'opacity-0'
       }`}
       style={{ width: size, height: size }}

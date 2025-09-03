@@ -1,52 +1,77 @@
 "use client";
 import { useEffect, useState } from "react";
 
-interface Transaction {
-  signature: string;
-  timestamp: number;
+interface TokenTradeAggregation {
+  id: number;
+  name?: string;
+  symbol?: string;
+  contract_address: string;
+  creator?: string;
+  source: string;
+  launch_time?: Date;
+  decimals: number;
+  supply: number;
+  blocktime: Date | null;
+  status: 'fresh' | 'active';
+  created_at: Date;
+  updated_at: Date;
+  display_name?: string;
+  // Market cap fields (if available)
+  price_usd?: number;
+  marketcap?: number;
+  volume_24h?: number;
+  liquidity?: number;
 }
 
 export default function SolanaTransactions() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [trades, setTrades] = useState<TokenTradeAggregation[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const fetchTrades = async () => {
       try {
-        const res = await fetch("/api/transactions", { cache: "no-store" });
+        const res = await fetch("http://localhost:8080/api/tokens/fresh", { cache: "no-store" });
         const data = await res.json();
-        if (Array.isArray(data)) {
-          setTransactions(data);
+        
+        // Handle both old and new API response formats
+        const items = data?.items ?? (Array.isArray(data) ? data : []);
+        
+        if (Array.isArray(items)) {
+          setTrades(items);
         } else {
-          setTransactions([]);
-          console.error("Invalid data format from API:", data);
+          setTrades([]);
+          console.error("Invalid data format from server API:", data);
         }
       } catch (err) {
-        console.error("Error fetching transactions:", err);
+        console.error("Error fetching trades from server:", err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchTransactions();
-    const interval = setInterval(fetchTransactions, 10000);
+    fetchTrades();
+    const interval = setInterval(fetchTrades, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  if (loading) return <div className="text-white p-6" style={{ fontFamily: 'VT323, monospace' }}>Loading Transactions...</div>;
+  if (loading) return <div className="text-white p-6" style={{ fontFamily: 'VT323, monospace' }}>Loading Trades...</div>;
 
-  if (!Array.isArray(transactions) || transactions.length === 0) {
-    return <div className="text-white p-6" style={{ fontFamily: 'VT323, monospace' }}>No transactions available</div>;
+  if (!Array.isArray(trades) || trades.length === 0) {
+    return <div className="text-white p-6" style={{ fontFamily: 'VT323, monospace' }}>No trades available</div>;
   }
 
   return (
     <div className="text-white" style={{ fontFamily: 'VT323, monospace' }}>
-      <h2 className="text-2xl font-bold mb-4">Solana Transactions through Quantum Eraser</h2>
+      <h2 className="text-2xl font-bold mb-4">Solana Token Trades through Quantum Eraser</h2>
       <div className="space-y-4">
-        {transactions.map((tx) => (
-          <div key={tx.signature} className="p-4 bg-white/5 border border-white/10 rounded">
-            <p>Signature: {tx.signature.slice(0, 10)}...</p>
-            <p>Timestamp: {new Date(tx.timestamp * 1000).toLocaleString()}</p>
+        {trades.map((trade) => (
+          <div key={trade.id} className="p-4 bg-white/5 border border-white/10 rounded">
+            <p>Token: {trade.contract_address?.slice(0, 10)}...</p>
+            <p>Name: {trade.display_name || trade.name || trade.symbol || 'Unknown'}</p>
+            <p>Supply: {trade.supply?.toLocaleString() || 'N/A'}</p>
+            <p>Decimals: {trade.decimals || 'N/A'}</p>
+            <p>Status: {trade.status || 'N/A'}</p>
+            <p>Created: {trade.created_at ? new Date(trade.created_at).toLocaleString() : 'N/A'}</p>
           </div>
         ))}
       </div>
