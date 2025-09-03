@@ -68,13 +68,30 @@ let globalStats = {
 // Global flag to ensure connection is started only once
 let globalConnectionStarted = false;
 
+// Helper function to ensure tokens have complete social links
+const enhanceTokenLinks = (token: TokenData): TokenData => ({
+  ...token,
+  links: {
+    ...token.links,
+    // Ensure all social platforms have at least placeholder values
+    website: token.links?.website,
+    twitter: token.links?.twitter,
+    telegram: token.links?.telegram,
+    discord: token.links?.discord,
+    pumpfun: token.links?.pumpfun,
+    dexscreener: token.links?.dexscreener || `https://dexscreener.com/solana/${token.mint}`,
+    jupiter: token.links?.jupiter || `https://jup.ag/swap/SOL-${token.mint}`,
+    explorer: token.links?.explorer || `https://solscan.io/token/${token.mint}`,
+  }
+});
+
 export const useSolanaData = (isOpen: boolean) => {
   const [tokens, setTokens] = useState<TokenData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [connectionStatus, setConnectionStatus] = useState<string>("Connecting...");
   const [currentRpc, setCurrentRpc] = useState<string>("");
-  const [hot, setHot] = useState<number>(0);
+  const [hot, setHot] = useState<boolean>(false);
   const [live, setLive] = useState<boolean>(true);
 
   // Refs
@@ -92,9 +109,11 @@ export const useSolanaData = (isOpen: boolean) => {
   // Sync local state with global state on mount
   useEffect(() => {
     if (globalTokens.length > 0) {
-      setTokens(globalTokens);
+      // Enhance existing tokens with complete social links
+      const enhancedTokens = globalTokens.map(enhanceTokenLinks);
+      setTokens(enhancedTokens);
       setLastUpdate(new Date());
-      console.log("🔄 Synced local state with global state:", globalTokens.length, "tokens");
+      console.log("🔄 Synced local state with global state:", enhancedTokens.length, "tokens");
     }
   }, []);
 
@@ -163,8 +182,9 @@ export const useSolanaData = (isOpen: boolean) => {
 
       // Check main instructions
       for (const ix of tx.transaction.message.instructions as any[]) {
-        if (ix.program === "spl-token" && 
-            (ix.parsed?.type === "initializeMint" || ix.parsed?.type === "initializeMint2")) {
+        if (ix.programId?.toString() === TOKEN_PROGRAM_ID.toString() && 
+            'parsed' in ix && ix.parsed && 
+            (ix.parsed.type === "initializeMint" || ix.parsed.type === "initializeMint2")) {
           return ix.parsed.info.mint;
         }
       }
@@ -172,8 +192,9 @@ export const useSolanaData = (isOpen: boolean) => {
       // Check inner instructions
       for (const inner of tx.meta.innerInstructions ?? []) {
         for (const ix of inner.instructions ?? []) {
-          if (ix.program === "spl-token" && 
-              (ix.parsed?.type === "initializeMint" || ix.parsed?.type === "initializeMint2")) {
+          if (ix.programId?.toString() === TOKEN_PROGRAM_ID.toString() && 
+              'parsed' in ix && ix.parsed && 
+              (ix.parsed.type === "initializeMint" || ix.parsed.type === "initializeMint2")) {
             return ix.parsed.info.mint;
           }
         }
@@ -196,7 +217,7 @@ export const useSolanaData = (isOpen: boolean) => {
       // Try metadata; if none, use safe fallbacks but still add.
       const md = await getTokenMetadata(mint);
 
-      const newToken: TokenData = {
+      const newToken: TokenData = enhanceTokenLinks({
         mint,
         name: md?.name ?? `Token ${mint.slice(0, 8)}`,
         symbol: md?.symbol ?? mint.slice(0, 4).toUpperCase(),
@@ -206,14 +227,14 @@ export const useSolanaData = (isOpen: boolean) => {
         createdAt: new Date(),
         image: md?.image,
         links: { explorer: `https://solscan.io/token/${mint}` },
-      };
+      });
 
       // Update both local and global state
       setTokens(prev => {
         if (prev.some(t => t.mint === mint)) return prev;
         const newTokens = [newToken, ...prev].slice(0, 1000);
-        // Also update global state
-        globalTokens = newTokens;
+        // Also update global state with enhanced tokens
+        globalTokens = newTokens.map(enhanceTokenLinks);
         console.log(`🔄 Updated tokens state: ${newTokens.length} total tokens`);
         return newTokens;
       });
@@ -238,6 +259,23 @@ export const useSolanaData = (isOpen: boolean) => {
     }
   }, [getTokenMetadata]);
 
+
+
+  // NO CLEANUP - Keep connection running forever
+  // const cleanup = useCallback(() => {
+  //   console.log("🧹 Cleaning up subscriptions...");
+  //   activeSubscriptions.current.forEach(subId => {
+  //     try {
+  //       connectionRef.current?.removeOnLogsListener(subId);
+  //     } catch (error) {
+  //       console.log("❌ Error cleaning up subscription:", error);
+  //     }
+  //   });
+  //   activeSubscriptions.current.clear();
+  // }, []);
+
+
+
   // 3) Listen only to InitializeMint, remove Raydium/Orca/Pump.fun listeners for now
   const startSolanaDataStream = useCallback(async () => {
     // Prevent restarting if already running globally
@@ -246,9 +284,9 @@ export const useSolanaData = (isOpen: boolean) => {
       return;
     }
     
-    // Prevent restarting if already running
+    // If connection exists and has subscriptions, don't restart
     if (connectionRef.current && activeSubscriptions.current.size > 0) {
-      console.log("🔄 Stream already running, skipping restart");
+      console.log("🔄 Stream already running with subscriptions, skipping restart");
       return;
     }
 
@@ -326,48 +364,52 @@ export const useSolanaData = (isOpen: boolean) => {
     }
   }, [processNewToken, findMintFromInitMint]);
 
-  // NO CLEANUP - Keep connection running forever
-  // const cleanup = useCallback(() => {
-  //   console.log("🧹 Cleaning up subscriptions...");
-  //   activeSubscriptions.current.forEach(subId => {
-  //     try {
-  //       connectionRef.current?.removeOnLogsListener(subId);
-  //     } catch (error) {
-  //       console.log("❌ Error cleaning up subscription:", error);
-  //     }
-  //   });
-  //   activeSubscriptions.current.clear();
-  // }, []);
-
   // Load existing tokens from recent transactions
   const loadExistingTokens = useCallback(async () => {
-    if (!connectionRef.current) return;
+    if (!connectionRef.current) {
+      console.log("❌ No connection available for loading tokens");
+      return;
+    }
+    
+    // Always try to load tokens, even if some exist
+    console.log("🔍 Loading existing tokens from recent transactions...");
+    console.log("🔍 Current global tokens count:", globalTokens.length);
     
     try {
-      console.log("🔍 Loading existing tokens from recent transactions...");
-      
       // Get recent signatures for the token program
       const signatures = await connectionRef.current.getSignaturesForAddress(
         new PublicKey(TOKEN_PROGRAM_ID),
-        { limit: 50 }
+        { limit: 100 } // Increased limit to get more tokens
       );
       
       console.log(`📝 Found ${signatures.length} recent token transactions`);
       
-      // Process the first 10 signatures to get some initial tokens
-      for (let i = 0; i < Math.min(10, signatures.length); i++) {
-        const sig = signatures[i];
+      // Process signatures with rate limiting to avoid 429 errors
+      const promises = signatures.slice(0, 15).map(async (sig, index) => {
+        // Add delay between requests to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, index * 300)); // 300ms delay between each
+        
         try {
+          console.log(`🔍 Processing signature ${index + 1}/15: ${sig.signature.slice(0, 8)}...`);
           const mintAddress = await findMintFromInitMint(sig.signature);
           if (mintAddress && !seenMints.current.has(mintAddress)) {
+            console.log(`✅ Found new mint: ${mintAddress.slice(0, 8)}...`);
             await processNewToken(mintAddress, sig.signature);
+          } else if (mintAddress) {
+            console.log(`🔄 Mint already seen: ${mintAddress.slice(0, 8)}...`);
+          } else {
+            console.log(`❌ No mint found in signature: ${sig.signature.slice(0, 8)}...`);
           }
         } catch (error) {
           console.warn(`Failed to process signature ${sig.signature}:`, error);
         }
-      }
+      });
+      
+      // Wait for all tokens to process in parallel
+      await Promise.all(promises);
       
       console.log("✅ Finished loading existing tokens");
+      console.log("✅ Final global tokens count:", globalTokens.length);
     } catch (error) {
       console.error("❌ Failed to load existing tokens:", error);
     }
@@ -375,22 +417,20 @@ export const useSolanaData = (isOpen: boolean) => {
 
   // 4) Start the stream once and keep it running
   useEffect(() => {
-    // Start the stream immediately and keep it running
-    const t = setTimeout(() => { 
-      startSolanaDataStream();
-      // Also load existing tokens after a short delay
-      setTimeout(() => loadExistingTokens(), 1000);
-    }, 200);
-    
-    // NEVER cleanup the connection - keep it running forever
-    // return () => { clearTimeout(t); };
-    
-    // Only clear the timeout, don't cleanup the connection
-    return () => { 
-      clearTimeout(t); 
-      // DO NOT cleanup subscriptions or connection
+    const startEverything = async () => {
+      // Start the data stream
+      await startSolanaDataStream();
+      
+      // Wait a bit for connection to establish, then load existing tokens
+      setTimeout(async () => {
+        if (connectionRef.current && globalTokens.length === 0) {
+          await loadExistingTokens();
+        }
+      }, 2000); // 2 second delay to ensure connection is ready
     };
-  }, [startSolanaDataStream, loadExistingTokens]); // Add loadExistingTokens dependency
+    
+    startEverything();
+  }, [startSolanaDataStream, loadExistingTokens]);
 
   // Resume live updates
   const resumeLive = useCallback(() => {
