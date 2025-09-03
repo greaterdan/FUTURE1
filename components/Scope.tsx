@@ -139,7 +139,7 @@ function TokenColumn({
   return (
     <div className={`flex flex-col gap-3 min-w-0 flex-1 ${className}`}>
       <h2 className="text-white text-lg font-bold text-center flex-shrink-0">{title}</h2>
-      <div className="rounded-2xl bg-black/20 p-4 overflow-y-auto flex-1 min-h-0">
+      <div className="rounded-2xl bg-black/20 p-4 overflow-y-auto h-[calc(100vh-200px)] max-h-[calc(100vh-200px)]">
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="text-center text-white/40 py-8">
@@ -242,14 +242,19 @@ export const Scope = ({
   }, [sendMessage]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
     setInputMessage(e.target.value);
   }, []);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive - ONLY when sending, not when typing
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Only auto-scroll when actually sending a message, not on every message change
+    if (messages.length > 0 && messages[0].type === 'user') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   // Early return after all hooks have been called
@@ -258,7 +263,7 @@ export const Scope = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col scope-container">
       {/* Header */}
       <div className="bg-black/80 border-b border-white/10 p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -319,7 +324,7 @@ export const Scope = ({
       </div>
 
       {/* Main Content */}
-      <div className="p-6 flex-1 overflow-hidden relative">
+      <div className="p-6 flex-1 overflow-hidden relative h-full">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center">
@@ -424,19 +429,22 @@ export const Scope = ({
                   <div ref={messagesEndRef} />
                 </div>
                 
-                {/* Input Area - Fixed at bottom */}
-                <div className="w-full bg-black/70 border-t border-gray-700 p-2 flex items-center gap-2 flex-shrink-0">
+                {/* Input Area - Fixed at bottom with fixed height */}
+                <div className="w-full bg-black/70 border-t border-gray-700 p-2 flex items-center gap-2 flex-shrink-0 h-16 chat-input-container">
                   <input
                     type="text"
                     value={inputMessage}
                     onChange={handleInputChange}
                     onKeyPress={handleKeyPress}
+                    onFocus={(e) => e.preventDefault()}
+                    onBlur={(e) => e.preventDefault()}
                     placeholder="Type your message..."
-                    className="flex-1 rounded-lg bg-gray-900 p-2 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 rounded-lg bg-gray-900 p-2 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 h-10"
+                    style={{ scrollBehavior: 'auto' }}
                   />
                   <button
                     onClick={sendMessage}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2"
+                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 h-10"
                   >
                     Send
                   </button>
