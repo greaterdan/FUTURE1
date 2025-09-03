@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { useServerData } from "@/hooks/useServerData";
+import { AnimatePresence } from "framer-motion";
 
 
 // Dynamically import all components to avoid SSR issues
@@ -38,7 +39,6 @@ export default function Page() {
     pauseLive,
     searchTokens,
     filterByStatus,
-    filterBySource,
     refresh,
   } = useServerData(true); // Always true - monitoring NEVER stops, regardless of Scope state
 
@@ -172,9 +172,10 @@ export default function Page() {
   return (
     <ErrorBoundary>
       <main className="fixed inset-0 overflow-visible">
+        {/* Always show background components - Scope will overlay on top */}
+        <RetroGeometry isSlow={isNavigationHubOpen} isOracleOpen={isOracleHubOpen} isScopeOpen={isScopeOpen} />
         <BackgroundVideo isOracleOpen={isOracleHubOpen} />
-        <RetroGeometry isSlow={isNavigationHubOpen} isOracleOpen={isOracleHubOpen} />
-        {!isOracleHubOpen && <LeftTypewriter />}
+        {!isOracleHubOpen && !isScopeOpen && <LeftTypewriter />}
         <CornerLogo size={64} isVisible={cornerLogoVisible} />
         <RadialVideoButtons 
           isNavigationHubOpen={isNavigationHubOpen}
@@ -184,23 +185,26 @@ export default function Page() {
           isOracleHubOpen={isOracleHubOpen}
           setIsOracleHubOpen={saveOracleState}
         />
-        
-
         <BottomNavigation isNavigationHubOpen={isNavigationHubOpen} isOracleHubOpen={isOracleHubOpen} />
-        <Scope 
-          isOpen={isScopeOpen}
-          tokens={tokens}
-          isLoading={solanaLoading}
-          lastUpdate={lastUpdate}
-          stats={stats}
-          connectionStatus={connectionStatus}
-          live={live}
-          resumeLive={resumeLive}
-          pauseLive={pauseLive}
-          onClose={() => saveScopeState(false)}
-        />
         
-
+        {/* SCOPE component - now overlays on top of background */}
+        <AnimatePresence mode="wait">
+          {isScopeOpen && (
+            <Scope 
+              key="scope"
+              isOpen={isScopeOpen}
+              tokens={tokens}
+              isLoading={solanaLoading}
+              lastUpdate={lastUpdate}
+              stats={stats}
+              connectionStatus={connectionStatus}
+              live={live}
+              resumeLive={resumeLive}
+              pauseLive={pauseLive}
+              onClose={() => saveScopeState(false)}
+            />
+          )}
+        </AnimatePresence>
       </main>
     </ErrorBoundary>
   );

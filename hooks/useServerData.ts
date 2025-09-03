@@ -17,7 +17,11 @@ export interface ServerTokenData {
   decimals: number;
   supply: number;
   blocktime: number;
-  status: 'fresh' | 'active';
+  status: 'fresh' | 'active' | 'curve';
+  metadata_uri?: string;
+  image_url?: string;
+  bonding_curve_address?: string;
+  is_on_curve: boolean;
   created_at: string;
   updated_at: string;
   display_name?: string;
@@ -35,10 +39,16 @@ export interface ServerTokenData {
 // Transformed token data for the frontend components
 export interface TransformedTokenData {
   mint: string;
+  name?: string;
+  symbol?: string;
   decimals: number;
   supply: number;
   blocktime: number;
-  status: 'fresh' | 'active';
+  status: 'fresh' | 'active' | 'curve';
+  imageUrl?: string;
+  metadataUri?: string;
+  isOnCurve: boolean;
+  bondingCurveAddress?: string;
   marketCap?: number;
   price?: number;
   volume24h?: number;
@@ -71,10 +81,16 @@ interface Stats {
 const transformTokenData = (serverToken: ServerTokenData): TransformedTokenData => {
   return {
     mint: serverToken.contract_address,
+    name: serverToken.name,
+    symbol: serverToken.symbol,
     decimals: serverToken.decimals,
     supply: serverToken.supply,
     blocktime: serverToken.blocktime,
     status: serverToken.status,
+    imageUrl: serverToken.image_url,
+    metadataUri: serverToken.metadata_uri,
+    isOnCurve: serverToken.is_on_curve,
+    bondingCurveAddress: serverToken.bonding_curve_address,
     marketCap: serverToken.latest_marketcap?.marketcap,
     price: serverToken.latest_marketcap?.price_usd,
     volume24h: serverToken.latest_marketcap?.volume_24h,

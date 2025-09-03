@@ -2,13 +2,20 @@
 import { useEffect, useRef } from "react";
 import p5 from "p5";
 
-interface Props { isSlow?: boolean; isOracleOpen?: boolean }
+interface Props { 
+  isSlow?: boolean; 
+  isOracleOpen?: boolean; 
+  isScopeOpen?: boolean; 
+}
 
-export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: Props) {
+export default function RetroGeometry({ isSlow = false, isOracleOpen = false, isScopeOpen = false }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const slowRef = useRef<boolean>(isSlow);
   const oracleOpenRef = useRef<boolean>(isOracleOpen);
+  const scopeOpenRef = useRef<boolean>(isScopeOpen);
   const hasZoomedRef = useRef<boolean>(false);
+  const previousScopeStateRef = useRef<boolean>(isScopeOpen); // Track Scope state changes outside p5 sketch
+
 
   // Check sessionStorage on component mount
   useEffect(() => {
@@ -20,6 +27,22 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
 
   useEffect(() => { slowRef.current = isSlow; }, [isSlow]);
   useEffect(() => { oracleOpenRef.current = isOracleOpen; }, [isOracleOpen]);
+  useEffect(() => { 
+    scopeOpenRef.current = isScopeOpen; 
+    // Track state changes for animation
+    if (isScopeOpen !== previousScopeStateRef.current) {
+      console.log('🎯 SCOPE PROP CHANGED:', isScopeOpen ? 'OPENED' : 'CLOSED', 'From:', previousScopeStateRef.current, 'To:', isScopeOpen);
+      previousScopeStateRef.current = isScopeOpen;
+    }
+  }, [isScopeOpen]);
+  
+  // Force complete reset when Scope state changes
+  useEffect(() => {
+    if (hostRef.current && hostRef.current.children.length > 0) {
+      // Completely clear and recreate when Scope state changes
+      hostRef.current.innerHTML = '';
+    }
+  }, [isScopeOpen]);
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -36,11 +59,14 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
       let mouseY = 0;
       let mouseInCanvas = false;
       let canvasReady = false;
-      let zoomLevel = hasZoomedRef.current ? 1 : 0; // Start at full size if already zoomed
+      let isInitialScopeOpen = scopeOpenRef.current; // Track if Scope was open on initial render
+      let zoomLevel = hasZoomedRef.current ? 1 : (isInitialScopeOpen ? 1 : 0); // Start at full size if Scope is open on initial render or already zoomed
       let currentGeometryX = p.width * 0.75; // Start at right side (default position)
       let currentOuterX = p.width * 0.75; // Start at right side (default position)
       let previousOracleState = false; // Track previous Oracle state
+      let previousScopeState = scopeOpenRef.current; // Track previous Scope state - start with current value
       let hasStartedAnimation = false; // Track if Oracle animation has started
+      let currentScopeScale = 1.0; // Always start at normal size for smooth zoom animation
       const DENSITY = Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 2);
 
       const S = () => Math.min(p.width, p.height) / 1800; // Smaller scale
@@ -51,6 +77,8 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
         gfx = p.createGraphics(p.width, p.height);
         gfx.pixelDensity(DENSITY);
         p.noCursor();
+        // Hide default cursor on the entire document
+        document.body.style.cursor = 'none';
         p.background(0);
         canvasReady = true;
       };
@@ -78,6 +106,13 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
       p.draw = () => {
         const slowFactor = slowRef.current ? 0.35 : 1.0;
         const isOracleOpen = oracleOpenRef.current;
+        const isScopeOpen = scopeOpenRef.current;
+        
+        // Debug: Log Scope state changes
+        if (isScopeOpen !== previousScopeStateRef.current) {
+          console.log('🎯 SCOPE STATE CHANGED:', isScopeOpen ? 'OPENED' : 'CLOSED', 'From:', previousScopeStateRef.current, 'To:', isScopeOpen);
+          previousScopeStateRef.current = isScopeOpen;
+        }
 
         // Fill the entire screen with black background
         p.background(0);
@@ -92,9 +127,36 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
           previousOracleState = isOracleOpen;
         }
         
+        // Smoothly animate Scope scale with frame-rate independent smoothing and additional smoothing
+        const targetScopeScale = isScopeOpen ? 2.5 : 1.0;
+        const baseLerpSpeed = isScopeOpen ? 0.012 : 0.025; // Even slower, smoother speeds
+        const frameRateIndependentSpeed = baseLerpSpeed * (p.deltaTime * 0.001 * 60); // Normalize to 60fps
+        const clampedSpeed = Math.min(frameRateIndependentSpeed, 0.08); // Cap maximum speed to prevent jumps
+        
+        // Apply additional smoothing to prevent micro-stutters
+        const smoothedTarget = p.lerp(currentScopeScale, targetScopeScale, 0.1); // Pre-smooth the target
+        currentScopeScale = p.lerp(currentScopeScale, smoothedTarget, clampedSpeed);
+        
+        // Debug: Log current values in draw loop
+        if (Math.abs(currentScopeScale - targetScopeScale) > 0.1) {
+          console.log('🎯 DRAW LOOP DEBUG:', 'isScopeOpen:', isScopeOpen, 'scopeOpenRef.current:', scopeOpenRef.current, 'currentScale:', currentScopeScale.toFixed(2));
+        }
+        
+        // Debug: Log the animation state
+        if (Math.abs(currentScopeScale - targetScopeScale) > 0.1) {
+          console.log('🎯 SCOPE ANIMATION:', isScopeOpen ? 'OPENING' : 'CLOSING', 'Current:', currentScopeScale.toFixed(2), 'Target:', targetScopeScale.toFixed(2));
+        }
+        
+
+        
         // Only animate if Oracle animation has started
         if (hasStartedAnimation) {
-          currentGeometryX = p.lerp(currentGeometryX, targetX, 0.06); // Slower and smoother transition
+          const oracleLerpSpeed = 0.08 * (p.deltaTime * 0.001 * 60); // Frame-rate independent, faster
+          const clampedOracleSpeed = Math.min(oracleLerpSpeed, 0.15); // Cap speed to prevent jumps
+          
+          // Apply additional smoothing to prevent micro-stutters
+          const smoothedTargetX = p.lerp(currentGeometryX, targetX, 0.3); // Pre-smooth the target
+          currentGeometryX = p.lerp(currentGeometryX, smoothedTargetX, clampedOracleSpeed);
         } else {
           currentGeometryX = targetX; // Set directly to avoid initial movement
         }
@@ -104,7 +166,7 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
         // Scale up geometry when Oracle is open to fill the left half better
         const baseScale = Math.pow(zoomLevel, 0.8);
         const oracleScale = isOracleOpen ? 1.8 : 1.0; // Scale up by 1.8x when Oracle open (smaller than before)
-        const currentScale = baseScale * oracleScale;
+        const currentScale = baseScale * oracleScale * currentScopeScale;
         gfx.scale(currentScale);
 
         gfx.rotate(t * 0.12 * slowFactor);
@@ -135,7 +197,12 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
         
         // Only animate if Oracle animation has started
         if (hasStartedAnimation) {
-          currentOuterX = p.lerp(currentOuterX, outerTargetX, 0.06); // Slower and smoother transition
+          const outerLerpSpeed = 0.08 * (p.deltaTime * 0.001 * 60); // Frame-rate independent, faster
+          const clampedOuterSpeed = Math.min(outerLerpSpeed, 0.15); // Cap speed to prevent jumps
+          
+          // Apply additional smoothing to prevent micro-stutters
+          const smoothedOuterTargetX = p.lerp(currentOuterX, outerTargetX, 0.3); // Pre-smooth the target
+          currentOuterX = p.lerp(currentOuterX, smoothedOuterTargetX, clampedOuterSpeed);
         } else {
           currentOuterX = outerTargetX; // Set directly to avoid initial movement
         }
@@ -143,7 +210,7 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
         outerGfx.translate(currentOuterX, p.height / 2);
         // Scale up outer ring when Oracle is open to fill the left half better
         const outerOracleScale = isOracleOpen ? 1.8 : 1.0; // Scale up by 1.8x when Oracle open (smaller than before)
-        const outerCurrentScale = baseScale * outerOracleScale;
+        const outerCurrentScale = baseScale * outerOracleScale * currentScopeScale;
         outerGfx.scale(outerCurrentScale);
         outerGfx.rotate(t * 0.12 * slowFactor);
         const R_outer = 720 * S();
@@ -272,8 +339,10 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false }: 
       if (hostRef.current) {
         hostRef.current.innerHTML = '';
       }
+      // Restore default cursor when component unmounts
+      document.body.style.cursor = 'auto';
     };
-      }, [isOracleOpen]);
+  }, [isOracleOpen, isScopeOpen]);
 
-  return <div ref={hostRef} className="fixed inset-0 overflow-visible pointer-events-none" style={{ zIndex: 10 }} />;
+  return <div ref={hostRef} className="fixed inset-0 overflow-visible pointer-events-none" style={{ zIndex: isOracleOpen ? 55 : 10 }} />;
 }

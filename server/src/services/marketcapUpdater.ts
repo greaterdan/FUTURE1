@@ -67,24 +67,29 @@ export class MarketcapUpdaterService {
         try {
             logger.info('Starting marketcap update cycle...');
             
-            // Get all tokens that need updating
+            // Get only AMM tokens that need pricing (exclude curve tokens)
             const tokens = await tokenRepository.getAllTokens();
-            const tokensToUpdate = tokens.filter(t => t.status === 'fresh' || t.status === 'active');
+            const ammTokens = tokens.filter(t => !t.is_on_curve && t.status !== 'curve');
             
-            logger.info(`Updating marketcap for ${tokensToUpdate.length} tokens`);
+            logger.info(`Found ${ammTokens.length} AMM tokens for pricing (excluding curve tokens)`);
             
-            // Update tokens in parallel with rate limiting
-            const batchSize = 5; // Process 5 tokens at a time to avoid rate limits
-            for (let i = 0; i < tokensToUpdate.length; i += batchSize) {
-                const batch = tokensToUpdate.slice(i, i + batchSize);
+            // Update AMM tokens with price data
+            if (ammTokens.length > 0) {
+                logger.info(`Updating marketcap for ${ammTokens.length} AMM tokens`);
                 
-                await Promise.all(
-                    batch.map(token => this.updateTokenMarketcap(token.contract_address, token.id))
-                );
-                
-                // Small delay between batches to avoid rate limits
-                if (i + batchSize < tokensToUpdate.length) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                // Update tokens in parallel with rate limiting
+                const batchSize = 5; // Process 5 tokens at a time to avoid rate limits
+                for (let i = 0; i < ammTokens.length; i += batchSize) {
+                    const batch = ammTokens.slice(i, i + batchSize);
+                    
+                    await Promise.all(
+                        batch.map(token => this.updateTokenMarketcap(token.mint, token.id))
+                    );
+                    
+                    // Small delay between batches to avoid rate limits
+                    if (i + batchSize < ammTokens.length) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
                 }
             }
             
@@ -129,6 +134,9 @@ export class MarketcapUpdaterService {
                     logger.info(`Token ${contractAddress} marked as active (liquidity: $${marketData.liquidity.toLocaleString()})`);
                 }
                 
+                // Check for AMM migration (token moving from curve to AMM)
+                await this.checkAMMMigration(contractAddress, tokenId);
+                
                 logger.debug(`Updated marketcap for ${contractAddress}: $${marketData.marketcap.toLocaleString()}`);
             } else {
                 logger.debug(`No market data available for ${contractAddress}`);
@@ -161,7 +169,11 @@ export class MarketcapUpdaterService {
                 liquidity: tokenData.liquidity || 0
             };
             
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.cause?.code === "ENOTFOUND") {
+                logger.debug("Jupiter DNS unavailable, skipping this tick");
+                return null;
+            }
             logger.debug(`Jupiter API failed for ${contractAddress}:`, error);
             return null;
         }
@@ -188,7 +200,11 @@ export class MarketcapUpdaterService {
                 liquidity: data.data.liquidity || 0
             };
             
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.cause?.code === "ENOTFOUND") {
+                logger.debug("Birdeye DNS unavailable, skipping this tick");
+                return null;
+            }
             logger.debug(`Birdeye API failed for ${contractAddress}:`, error);
             return null;
         }
@@ -217,9 +233,37 @@ export class MarketcapUpdaterService {
                 liquidity: parseFloat(bestPair.liquidity?.usd) || 0
             };
             
-        } catch (error) {
+        } catch (error: any) {
+            if (error?.cause?.code === "ENOTFOUND") {
+                logger.debug("DexScreener DNS unavailable, skipping this tick");
+                return null;
+            }
             logger.debug(`DexScreener API failed for ${contractAddress}:`, error);
             return null;
+        }
+    }
+
+    private async checkAMMMigration(contractAddress: string, tokenId: number): Promise<void> {
+        try {
+            // Check if this token was previously on a curve and now has AMM data
+            const token = await tokenRepository.findByMint(contractAddress);
+            if (!token || !token.is_on_curve) return;
+
+            // If we have marketcap data, the token has migrated to AMM
+            await tokenRepository.updateTokenMetadata(
+                tokenId,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                false // is_on_curve = false
+            );
+            
+            logger.info(`AMM migration detected: ${contractAddress} → status=active (moved from curve to AMM)`);
+            
+        } catch (error) {
+            logger.debug(`Error checking AMM migration for ${contractAddress}:`, error);
         }
     }
 }

@@ -12,6 +12,17 @@ export default function BottomNavigation({ isNavigationHubOpen = false, isOracle
   const animationRef = useRef<number | undefined>(undefined);
   const targetPosition = isNavigationHubOpen ? 1 : 0;
 
+  // Check if buttons have appeared before on component mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const buttonsAppeared = sessionStorage.getItem('bottomNavButtonsHaveAppeared');
+      if (buttonsAppeared === 'true') {
+        // If buttons have appeared before, show them immediately
+        setVisibleButtons([0, 1, 2]);
+      }
+    }
+  }, []);
+
   // Smooth position animation using requestAnimationFrame
   useEffect(() => {
     const animate = () => {
@@ -38,14 +49,24 @@ export default function BottomNavigation({ isNavigationHubOpen = false, isOracle
     };
   }, [targetPosition]);
 
-  // Staggered appearance after webm icons (which finish at ~6.3s)
+  // Staggered appearance after webm icons (which finish at ~6.3s) - ONLY ON FIRST VISIT
   useEffect(() => {
+    // If buttons have already appeared, don't animate again
+    if (visibleButtons.length === 3) return;
+
     const timer = setTimeout(() => {
       // Start appearing buttons one by one with 400ms delay between each
       const showButtons = () => {
         setVisibleButtons(prev => {
           if (prev.length < 3) {
-            return [...prev, prev.length];
+            const newButtons = [...prev, prev.length];
+            // Mark as appeared when all buttons are shown
+            if (newButtons.length === 3) {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('bottomNavButtonsHaveAppeared', 'true');
+              }
+            }
+            return newButtons;
           }
           return prev;
         });
@@ -61,7 +82,7 @@ export default function BottomNavigation({ isNavigationHubOpen = false, isOracle
     }, 7000); // Wait for webm icons to finish appearing (~6.3s) + buffer
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [visibleButtons.length]);
 
   // Calculate position based on animation state
   const centerX = typeof window !== 'undefined' ? window.innerWidth / 2 : 0;

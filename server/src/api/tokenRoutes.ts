@@ -4,7 +4,7 @@ import { logger } from '../utils/logger';
 
 const router = Router();
 
-// GET /tokens/fresh - Get latest fresh tokens, ordered by blocktime DESC
+// GET /tokens/fresh - Get latest fresh and curve tokens, ordered by blocktime DESC
 router.get('/fresh', async (req: Request, res: Response) => {
     try {
         const limit = parseInt(req.query.limit as string) || 100;
@@ -16,16 +16,28 @@ router.get('/fresh', async (req: Request, res: Response) => {
             });
         }
 
-        const [tokens, total] = await Promise.all([
+        // Get both fresh and curve tokens
+        const [freshTokens, curveTokens] = await Promise.all([
             tokenRepository.findFreshTokens(limit, offset),
-            tokenRepository.countFreshTokens()
+            tokenRepository.findTokensByStatus('curve', limit, offset)
         ]);
         
-        logger.info(`Fresh tokens fetched successfully. Count: ${total}`);
+        // Combine and sort by blocktime
+        const allTokens = [...freshTokens, ...curveTokens]
+            .sort((a, b) => {
+                const aTime = a.blocktime || a.created_at;
+                const bTime = b.blocktime || b.created_at;
+                return new Date(bTime).getTime() - new Date(aTime).getTime();
+            })
+            .slice(0, limit);
+        
+        const total = freshTokens.length + curveTokens.length;
+        
+        logger.info(`Fresh/curve tokens fetched successfully. Count: ${total}`);
         
         return res.json({
             total,
-            items: tokens
+            items: allTokens
         });
         
     } catch (error) {

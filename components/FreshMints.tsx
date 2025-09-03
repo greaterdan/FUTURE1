@@ -105,12 +105,12 @@ const FreshMints: React.FC<FreshMintsProps> = ({ mints, isLoading, lastUpdate, e
                 key={mint.id}
                 initial={isNewMint ? { 
                   opacity: 0, 
-                  y: -30, 
-                  scale: 0.95,
-                  filter: "blur(2px)"
+                  y: -8, 
+                  scale: 0.98,
+                  filter: "blur(0.5px)"
                 } : { 
                   opacity: 0, 
-                  y: 20 
+                  y: 8 
                 }}
                 animate={isNewMint ? {
                   opacity: 1,
@@ -121,28 +121,29 @@ const FreshMints: React.FC<FreshMintsProps> = ({ mints, isLoading, lastUpdate, e
                   opacity: 1,
                   y: 0
                 }}
-                exit={{ opacity: 0, y: -20 }}
+                exit={{ opacity: 0, y: -8 }}
                 transition={{ 
-                  duration: isNewMint ? 0.6 : 0.3,
-                  delay: isNewMint ? 0 : index * 0.05,
-                  ease: isNewMint ? [0.25, 0.46, 0.45, 0.94] : [0.25, 0.46, 0.45, 0.94]
+                  duration: isNewMint ? 0.8 : 0.5,
+                  delay: isNewMint ? 0 : index * 0.02,
+                  ease: [0.25, 0.46, 0.45, 0.94]
                 }}
                 className={`relative p-4 bg-white/5 border rounded-lg hover:bg-white/10 transition-all duration-200 ${
                   isNewMint 
                     ? 'border-green-400/50 shadow-lg shadow-green-400/20 bg-gradient-to-r from-green-500/10 to-transparent' 
                     : 'border-white/10'
-                }`}
+                } ${index === mints.length - 1 ? 'mb-4' : ''}`}
                 style={{
-                  animation: isNewMint ? 'newMintGlow 2s ease-out' : 'none'
+                  willChange: 'transform, opacity, filter',
+                  backfaceVisibility: 'hidden'
                 }}
               >
-                {/* Subtle glow effect for new mints */}
+                {/* Very subtle glow effect for new mints */}
                 {isNewMint && (
                   <motion.div
-                    initial={{ opacity: 0.8 }}
+                    initial={{ opacity: 0.3 }}
                     animate={{ opacity: 0 }}
-                    transition={{ duration: 2, ease: "easeOut" }}
-                    className="absolute inset-0 rounded-lg bg-gradient-to-r from-green-400/20 to-transparent pointer-events-none"
+                    transition={{ duration: 3, ease: "easeOut" }}
+                    className="absolute inset-0 rounded-lg bg-gradient-to-r from-green-400/10 to-transparent pointer-events-none"
                   />
                 )}
                 

@@ -98,7 +98,12 @@ export class MintWatcherService {
                 mintInfo.supply,
                 new Date(mintInfo.blocktime * 1000),
                 undefined, // name - fresh mints often don't have metadata yet
-                undefined  // symbol - fresh mints often don't have metadata yet
+                undefined, // symbol - fresh mints often don't have metadata yet
+                undefined, // metadataUri
+                undefined, // imageUrl
+                undefined, // bondingCurveAddress
+                false,     // isOnCurve - default to false, will be updated by metadata enricher
+                'fresh'    // status
             );
 
             logger.info(`Successfully processed mint: ${mintInfo.mint} (${mintInfo.decimals} decimals)`);

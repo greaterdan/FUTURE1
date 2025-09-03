@@ -199,6 +199,44 @@ class DatabaseConnection {
                     ALTER TABLE tokens ADD CONSTRAINT tokens_source_check 
                     CHECK (source IN ('pump', 'meteora', 'helius'));
                 `);
+                
+                // Add new columns for metadata and bonding curve
+                await client.query(`
+                    ALTER TABLE tokens ADD COLUMN IF NOT EXISTS metadata_uri TEXT;
+                `);
+                
+                await client.query(`
+                    ALTER TABLE tokens ADD COLUMN IF NOT EXISTS image_url TEXT;
+                `);
+                
+                await client.query(`
+                    ALTER TABLE tokens ADD COLUMN IF NOT EXISTS bonding_curve_address TEXT;
+                `);
+                
+                await client.query(`
+                    ALTER TABLE tokens ADD COLUMN IF NOT EXISTS is_on_curve BOOLEAN DEFAULT FALSE;
+                `);
+                
+                // Update status constraint to allow 'curve' status
+                await client.query(`
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1
+                            FROM pg_constraint c
+                            JOIN pg_class t ON t.oid = c.conrelid
+                            WHERE t.relname = 'tokens' AND c.conname = 'tokens_status_check'
+                        ) THEN
+                            EXECUTE 'ALTER TABLE tokens DROP CONSTRAINT tokens_status_check';
+                        END IF;
+                    END $$;
+                `);
+                
+                await client.query(`
+                    ALTER TABLE tokens
+                    ADD CONSTRAINT tokens_status_check
+                    CHECK (status IN ('fresh','active','curve'));
+                `);
             });
             
             console.log('Database schema ensured successfully');

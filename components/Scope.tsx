@@ -29,12 +29,60 @@ export function useVisibility(mint: string, visibleMintsRef: React.MutableRefObj
 type CardProps = { token: any; visibleMintsRef: React.MutableRefObject<Set<string>> };
 const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [attachedCompanion, setAttachedCompanion] = useState<string | null>(null);
   
   const copyMintAddress = async () => {
     try {
       await navigator.clipboard.writeText(token.mint);
     } catch (err) {
       console.error('Failed to copy mint address:', err);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    // Completely disable drag over if companion is already attached
+    if (attachedCompanion) {
+      return;
+    }
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    // Prevent dropping if a companion is already attached
+    if (attachedCompanion) {
+      console.log(`Token ${token.mint} already has companion ${attachedCompanion} attached`);
+      return;
+    }
+    
+    const agentName = e.dataTransfer.getData('text/plain');
+    if (agentName) {
+      console.log(`Agent ${agentName} dropped on token ${token.mint}`);
+      
+      // Set the attached companion
+      setAttachedCompanion(agentName);
+      
+      // Add a success animation
+      const card = e.currentTarget as HTMLElement;
+      card.style.transform = 'scale(1.05)';
+      card.style.transition = 'transform 0.2s ease-out';
+      
+      setTimeout(() => {
+        card.style.transform = 'scale(1)';
+      }, 200);
+      
+      // Here you can add logic to handle the agent-token interaction
+      // For example, open chat with the agent analyzing this specific token
+      // You could emit an event or call a callback to open the chat panel
     }
   };
   
@@ -47,18 +95,55 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
         duration: 0.15,
         ease: "easeOut"
       }}
-      className="relative isolate overflow-visible rounded-xl border border-white/10 bg-white/5 p-4 shadow-sm hover:scale-105 hover:z-10 transition-all duration-200 token-card"
+      className={`relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-105 hover:z-10 transition-all duration-200 token-card ${
+        isDragOver && !attachedCompanion
+          ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]' 
+          : 'border-white/10 bg-white/5'
+      }`}
       style={{ willChange: 'transform' }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      draggable={false}
     >
+      {/* Drop indicator overlay */}
+      {isDragOver && !attachedCompanion && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl border-2 border-dashed border-blue-400/60 flex items-center justify-center z-10 backdrop-blur-sm"
+        >
+          <div className="text-blue-400 text-sm font-medium flex items-center space-x-2 bg-black/50 px-3 py-2 rounded-lg">
+            <span>Drop Companion Here</span>
+          </div>
+        </motion.div>
+      )}
+      
 
+
+      {/* Attached Companion Icon */}
+      {attachedCompanion && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-20"
+        >
+          <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-lg border border-white/30 flex items-center justify-center">
+            <span className="text-white text-xs font-bold">
+              {attachedCompanion.split(' ').map(word => word[0]).join('')}
+            </span>
+          </div>
+        </motion.div>
+      )}
       
       {/* Header row: avatar, name/symbol, copy button */}
       <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
         {/* Avatar container with HoverImagePreview */}
         <div className="relative h-9 w-9 shrink-0 overflow-visible">
           <HoverImagePreview 
-            src={token.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(token.symbol || "T")}`}
-            alt={token.symbol || token.name}
+            src={token.image_url || token.image || `https://api.dicebear.com/8.x/shapes/svg?seed=${token.mint}`}
+            alt={token.symbol || token.name || "Token"}
             thumbClass="h-full w-full object-cover rounded-md"
           />
         </div>
@@ -66,9 +151,11 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
         {/* Token info */}
         <div className="min-w-0">
           <h3 className="text-white font-semibold truncate">
-            {token.name}
+            {token.name || token.symbol || `${token.mint.slice(0, 4)}…${token.mint.slice(-4)}`}
           </h3>
-          <div className="text-green-400 text-sm font-mono truncate">{token.symbol}</div>
+          <div className="text-white/80 text-sm font-mono truncate">
+            {token.symbol || token.mint.slice(0, 4)}
+          </div>
         </div>
         
         {/* Copy button */}
@@ -88,22 +175,31 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef 
         <div className="min-w-0">
           <span className="text-white/60">MC:</span>
           <span className="text-white ml-1 font-mono truncate">
-            ${token.marketCap ? token.marketCap.toLocaleString() : '—'}
+            {token.is_on_curve ? '— (on curve)' : (token.marketcap ? `$${token.marketcap.toLocaleString()}` : '—')}
           </span>
         </div>
         <div className="min-w-0">
           <span className="text-white/60">Price:</span>
           <span className="text-white ml-1 font-mono truncate">
-            ${token.price ? token.price.toFixed(8) : '—'}
+            {token.is_on_curve ? '— (on curve)' : (token.price_usd ? `$${token.price_usd.toFixed(8)}` : '—')}
           </span>
         </div>
         <div className="min-w-0">
           <span className="text-white/60">Vol:</span>
           <span className="text-white ml-1 font-mono truncate">
-            ${token.volume24h ? Math.round(token.volume24h).toLocaleString() : '—'}
+            {token.is_on_curve ? '— (on curve)' : (token.volume_24h ? `$${Math.round(token.volume_24h).toLocaleString()}` : '—')}
           </span>
         </div>
       </div>
+      
+      {/* Bonding Curve Badge */}
+      {(token.is_on_curve || token.status === 'curve') && (
+        <div className="mt-2 flex justify-center">
+          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gradient-to-r from-purple-500 to-pink-500 text-white">
+            BONDING CURVE
+          </span>
+        </div>
+      )}
       
       {/* Badges row */}
       <div className="mt-3 flex items-center gap-2">
@@ -120,10 +216,12 @@ const shallowPickEq = (a: any, b: any) =>
   a.mint === b.mint &&
   a.name === b.name &&
   a.symbol === b.symbol &&
-  a.price === b.price &&
+  a.image_url === b.image_url &&
+  a.is_on_curve === b.is_on_curve &&
+  a.price_usd === b.price_usd &&
   a.liquidity === b.liquidity &&
-  a.volume24h === b.volume24h &&
-  JSON.stringify(a.links) === JSON.stringify(b.links);
+  a.volume_24h === b.volume_24h &&
+  JSON.stringify(a.links) === JSON.stringify(a.links);
 
 export const TokenCard = React.memo(TokenCardBase, (prev, next) =>
   shallowPickEq(prev.token, next.token)
@@ -143,9 +241,10 @@ function TokenColumn({
 }) {
 
   return (
-    <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 ${className}`}>
+    <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 cursor-default ${className}`}>
       <h2 className="text-white text-lg font-bold text-center flex-shrink-0">{title}</h2>
-      <div className="rounded-2xl bg-black/20 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-200px)] max-h-[calc(100vh-200px)]">
+      <div className="w-full border-b border-gray-700 mb-3 -mx-3" />
+      <div className="rounded-2xl bg-black/20 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6 cursor-default">
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="text-center text-white/40 py-8">
@@ -158,7 +257,7 @@ function TokenColumn({
                 {items.length} tokens
               </div>
               {items.map((token, index) => (
-                <div key={`${token.mint}-${token.updated_at || token.created_at || index}`} className="relative">
+                <div key={`${token.mint}-${token.updated_at || token.created_at || index}`} className={`relative ${index === items.length - 1 ? 'mb-4' : ''}`}>
                   <TokenCard 
                     token={token} 
                     visibleMintsRef={visibleMintsRef} 
@@ -207,6 +306,10 @@ export const Scope = ({
   // AI Agents state
   const [hoveredAgent, setHoveredAgent] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  
+  // Chat resize state
+  const [chatWidth, setChatWidth] = useState(450);
+  const [isResizing, setIsResizing] = useState(false);
 
   // Auto-close chat when Scope closes
   useEffect(() => {
@@ -214,8 +317,83 @@ export const Scope = ({
       setIsChatOpen(false);
       setMessages([]);
       setInputMessage('');
+      setChatWidth(450); // Reset width when closing
     }
   }, [isOpen]);
+  
+  // Chat resize handlers
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  };
+  
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return;
+    
+    const newWidth = window.innerWidth - e.clientX;
+    const minWidth = 300;
+    const maxWidth = 800;
+    
+    if (newWidth >= minWidth && newWidth <= maxWidth) {
+      // Use requestAnimationFrame for smooth updates
+      requestAnimationFrame(() => {
+        setChatWidth(newWidth);
+      });
+    }
+  }, [isResizing]);
+  
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+  
+  // Add resize event listeners
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleResizeMove);
+        document.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [isResizing, handleResizeMove, handleResizeEnd]);
+
+  // Cleanup function for drag previews
+  const cleanupDragPreviews = useCallback(() => {
+    // Clean up by data attribute first (most reliable)
+    const dragPreviews = document.querySelectorAll('[data-drag-preview="true"]');
+    dragPreviews.forEach(preview => {
+      if (preview.parentNode) {
+        preview.parentNode.removeChild(preview);
+      }
+    });
+    
+    // Fallback cleanup for any remaining previews
+    const previews = document.querySelectorAll('[style*="pointer-events-none"], [style*="left: -9999px"]');
+    previews.forEach(preview => {
+      if (preview.parentNode) {
+        preview.parentNode.removeChild(preview);
+      }
+    });
+  }, []);
+
+  // Clean up drag previews when component unmounts or when Scope closes
+  useEffect(() => {
+    return () => {
+      cleanupDragPreviews();
+    };
+  }, [cleanupDragPreviews]);
+
+  // Also clean up on window blur (when user switches tabs or drag is interrupted)
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      cleanupDragPreviews();
+    };
+
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
+  }, [cleanupDragPreviews]);
 
   // AI Agents data
   const agents = [
@@ -256,27 +434,30 @@ export const Scope = ({
     console.log("🔍 Filtering tokens:", tokens?.length || 0, "tokens received");
     if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
       console.log("❌ No tokens to filter");
-      return { newPairs: [], onEdge: [], filled: [] };
+      return { newPairs: [], onEdge: [], filled: [], curveTokens: [] };
     }
     
     // Debug: Log first few tokens to see their structure
     console.log("🔍 Sample tokens:", tokens.slice(0, 3).map(t => ({
       name: t.name,
       symbol: t.symbol,
-      status: t.status
+      status: t.status,
+      isOnCurve: t.isOnCurve
     })));
     
-    const newPairs = tokens.filter(t => t && t.status === 'fresh');
+    const newPairs = tokens.filter(t => t && t.status === 'fresh' && !t.isOnCurve);
     const filled = tokens.filter(t => t && t.status === 'active');
-    const onEdge = tokens.filter(t => t && t.status === 'fresh' && t.latest_marketcap?.liquidity && t.latest_marketcap.liquidity > 0);
+    const onEdge = tokens.filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.latest_marketcap?.liquidity && t.latest_marketcap.liquidity > 0);
+    const curveTokens = tokens.filter(t => t && (t.status === 'curve' || t.isOnCurve));
     
     console.log("✅ Filtered tokens:", {
       newPairs: newPairs.length,
       onEdge: onEdge.length, 
       filled: filled.length,
+      curveTokens: curveTokens.length,
       total: tokens.length
     });
-    return { newPairs, onEdge, filled };
+    return { newPairs, onEdge, filled, curveTokens };
   }, [tokens]);
 
   // Chat functions - memoized to prevent recreation
@@ -317,6 +498,25 @@ export const Scope = ({
     }
   }, [messages]);
 
+  // Add keyboard shortcut to close SCOPE with Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Clean up state immediately when closing
+        setIsChatOpen(false);
+        setMessages([]);
+        setInputMessage('');
+        // Call the parent's onClose function
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [isOpen, onClose]);
+
   // Early return after all hooks have been called
   if (!isOpen) {
     return null;
@@ -324,78 +524,112 @@ export const Scope = ({
 
   return (
     <motion.div 
-      className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col scope-container"
-      initial={{ opacity: 0, scale: 0.95 }}
+      className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col scope-container cursor-default"
+      initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      exit={{ opacity: 0, scale: 0.98 }}
       transition={{ 
         duration: 0.4, 
-        ease: [0.25, 0.46, 0.45, 0.94],
-        staggerChildren: 0.1
+        ease: [0.25, 0.46, 0.45, 0.94]
       }}
+      style={{ cursor: 'default' }}
     >
       {/* Header */}
       <motion.div 
         className="bg-black/80 border-b border-white/10 p-4 flex-shrink-0"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.46, 0.45, 0.94] }}
+        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-6">
-            <motion.h1 
-              className="text-2xl font-bold text-white"
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              SCOPE
-            </motion.h1>
-            
-            {/* Chat Toggle Button */}
+        <div className="grid grid-cols-3 items-center">
+                      {/* Left side - SCOPE title only */}
+            <div className="flex items-center">
+              <motion.h1 
+                className="text-2xl font-bold text-white"
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+              >
+                SCOPE
+              </motion.h1>
+            </div>
+          
+                     {/* Center - Search Bar + Chat Button (same row) */}
+           <div className="flex items-center justify-center space-x-4">
+             {/* Search Bar */}
+             <motion.div 
+               className="w-96"
+               initial={{ y: -10, opacity: 0 }}
+               animate={{ y: 0, opacity: 1 }}
+               transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+             >
+               <div className="relative">
+                 <input
+                   type="text"
+                   placeholder="Search by token or CA"
+                   className="w-full px-4 py-2 bg-transparent border border-white/30 rounded-full text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
+                 />
+                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                   <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                   </svg>
+                 </div>
+               </div>
+             </motion.div>
+             
+             {/* Chat Button - Between Search and Close */}
+             <motion.button
+               onClick={() => setIsChatOpen(!isChatOpen)}
+               className={`p-2 rounded-full transition-all duration-300 ${
+                 isChatOpen 
+                   ? 'bg-gradient-to-r from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30' 
+                   : 'bg-white/10 hover:bg-white/20 border border-white/20'
+               }`}
+               initial={{ y: -10, opacity: 0 }}
+               animate={{ y: 0, opacity: 1 }}
+               transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+               whileHover={{ scale: 1.1 }}
+               whileTap={{ scale: 0.95 }}
+             >
+               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+               </svg>
+             </motion.button>
+           </div>
+          
+          {/* Right side - Close Button */}
+          <div className="flex justify-end">
             <motion.button
-              onClick={() => setIsChatOpen(!isChatOpen)}
-              className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${
-                isChatOpen 
-                  ? 'bg-green-600 hover:bg-blue-700 text-white' 
-                  : 'bg-blue-700 hover:bg-blue-800 text-white'
-              }`}
-              initial={{ y: -10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] }}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                // Clean up state immediately when closing
+                setIsChatOpen(false);
+                setMessages([]);
+                setInputMessage('');
+                // Call the parent's onClose function
+                onClose();
+              }}
+              className="text-white/60 hover:text-white transition-colors duration-200"
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+              whileHover={{ scale: 1.1, rotate: 90 }}
+              whileTap={{ scale: 0.9 }}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-              <span className="text-sm font-medium">{isChatOpen ? 'Close Chat' : 'Chat'}</span>
             </motion.button>
           </div>
-          
-          {/* Close Button - Top Right */}
-          <motion.button
-            onClick={onClose}
-            className="text-white/60 hover:text-white transition-colors duration-200"
-            initial={{ x: 20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] }}
-            whileHover={{ scale: 1.1, rotate: 90 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </motion.button>
         </div>
       </motion.div>
 
       {/* Main Content */}
       <motion.div 
-        className="p-6 flex-1 overflow-hidden relative h-full"
+        className="p-6 flex-1 overflow-hidden relative h-full cursor-default"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        style={{ cursor: 'default' }}
       >
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -415,23 +649,27 @@ export const Scope = ({
         ) : (
           <div className="flex gap-6">
             {/* Token Columns - will shrink/expand based on chat state with smooth animation */}
-            <div className={`flex gap-6 transition-all duration-300 ease-in-out ${
-              isChatOpen ? 'w-[calc(100%-450px)]' : 'w-full'
-            }`}>
+            <div 
+              className="flex gap-6"
+              style={{
+                width: isChatOpen ? `calc(100% - ${chatWidth}px)` : '100%',
+                transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+            >
               <TokenColumn 
-                title="Fresh Mints" 
+                title="FRESH MINTS" 
                 items={filteredTokens.newPairs} 
                 className="border-r border-gray-700 flex-1"
                 visibleMintsRef={visibleMintsRef}
               />
               <TokenColumn 
-                title="Fresh + Liquidity" 
+                title="ON EDGE" 
                 items={filteredTokens.onEdge} 
                 className="border-r border-gray-700 flex-1"
                 visibleMintsRef={visibleMintsRef}
               />
               <TokenColumn 
-                title="Active Tokens" 
+                title="FILLED" 
                 items={filteredTokens.filled} 
                 className="flex-1"
                 visibleMintsRef={visibleMintsRef}
@@ -439,11 +677,26 @@ export const Scope = ({
             </div>
             
             {/* Chat + Companions Panel - Absolute positioned for full height with smooth animation */}
-            <div className={`bg-black/80 border-l border-gray-700 transition-all duration-300 ease-in-out ${
-              isChatOpen 
-                ? 'w-[450px]' 
-                : 'w-0 overflow-hidden'
-            } absolute right-0 bottom-0 h-full z-50 flex-shrink-0`}>
+            <div 
+              className={`bg-black/80 border-l border-gray-700 absolute right-0 bottom-0 h-full z-50 flex-shrink-0 ${
+                isChatOpen ? 'overflow-hidden' : 'w-0 overflow-hidden'
+              }`}
+              style={{
+                width: isChatOpen ? `${chatWidth}px` : '0px',
+                transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+              }}
+            >
+              {/* Resize Handle - Left edge */}
+              {isChatOpen && (
+                <div
+                  className="absolute left-0 top-0 bottom-0 w-2 bg-gray-600 hover:bg-blue-500 cursor-col-resize transition-colors duration-200 z-10 group"
+                  onMouseDown={handleResizeStart}
+                  title="Drag to resize chat panel"
+                >
+                  {/* Visual indicator for resize handle */}
+                  <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-0.5 h-8 bg-white/30 group-hover:bg-white/50 transition-all duration-200" />
+                </div>
+              )}
               <div className="h-full flex flex-col">
                 {/* Companions Section - Fixed height */}
                 <div className="p-4 border-b border-gray-700 flex-shrink-0">
@@ -464,10 +717,12 @@ export const Scope = ({
                             
                             // Create a custom drag preview that's bigger and animated
                             const dragPreview = document.createElement('div');
-                            dragPreview.className = 'fixed pointer-events-none z-[9999] bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full shadow-2xl border-2 border-white/20';
+                            dragPreview.className = 'absolute pointer-events-none z-[100] bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full shadow-2xl border-2 border-white/20';
+                            dragPreview.setAttribute('data-drag-preview', 'true');
                             dragPreview.style.width = '80px';
                             dragPreview.style.height = '80px';
-                            dragPreview.style.transform = 'translate(-50%, -50%)';
+                            dragPreview.style.left = '-9999px'; // Position off-screen
+                            dragPreview.style.top = '-9999px';
                             dragPreview.style.transition = 'all 0.2s ease-out';
                             
                             // Add the agent initials
@@ -482,21 +737,16 @@ export const Scope = ({
                             // Set the custom drag image
                             e.dataTransfer.setDragImage(dragPreview, 40, 40);
                             
-                            // Remove the preview after drag starts
-                            setTimeout(() => {
+                            // Remove the preview immediately after drag image is set
+                            requestAnimationFrame(() => {
                               if (document.body.contains(dragPreview)) {
                                 document.body.removeChild(dragPreview);
                               }
-                            }, 100);
+                            });
                           }}
                           onDragEnd={(e) => {
-                            // Clean up any remaining previews
-                            const previews = document.querySelectorAll('[style*="pointer-events-none"]');
-                            previews.forEach(preview => {
-                              if (preview.parentNode) {
-                                preview.parentNode.removeChild(preview);
-                              }
-                            });
+                            // Use the centralized cleanup function
+                            cleanupDragPreviews();
                           }}
                         >
                           <div className="w-full h-full flex items-center justify-center text-white font-bold text-xs text-center leading-tight">

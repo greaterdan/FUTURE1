@@ -89,6 +89,27 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
   overflow: hidden !important;
 }
 
+/* Ensure cursor is always visible on Scope and Oracle pages */
+.scope-container,
+.scope-container *,
+.oracle-hub,
+.oracle-hub * {
+  cursor: default !important;
+}
+
+/* Specific cursor styles for interactive elements */
+.scope-container button,
+.scope-container [role="button"],
+.scope-container input,
+.scope-container textarea,
+.scope-container select,
+.scope-container a,
+.scope-container .cursor-pointer,
+.scope-container .cursor-grab,
+.scope-container .cursor-grabbing {
+  cursor: inherit !important;
+}
+
 
 
 /* Prevent layout shifts and page movement */

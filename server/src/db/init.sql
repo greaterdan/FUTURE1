@@ -4,11 +4,19 @@
 -- Create tokens table for discovered mints
 CREATE TABLE IF NOT EXISTS tokens (
     id SERIAL PRIMARY KEY,
-    contract_address VARCHAR(255) UNIQUE NOT NULL,
+    mint VARCHAR(255) UNIQUE NOT NULL,
+    name TEXT,
+    symbol TEXT,
+    metadata_uri TEXT,
+    image_url TEXT,
+    bonding_curve_address TEXT,
+    is_on_curve BOOLEAN DEFAULT FALSE,
     decimals INTEGER NOT NULL DEFAULT 0,
     supply BIGINT NOT NULL DEFAULT 0,
     blocktime TIMESTAMPTZ,
-    status VARCHAR(50) NOT NULL DEFAULT 'fresh' CHECK (status IN ('fresh', 'active')),
+    status VARCHAR(50) NOT NULL DEFAULT 'fresh' CHECK (status IN ('fresh', 'curve', 'active')),
+    source VARCHAR(100),
+    creator VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -25,8 +33,9 @@ CREATE TABLE IF NOT EXISTS marketcaps (
 );
 
 -- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_tokens_contract_address ON tokens(contract_address);
+CREATE INDEX IF NOT EXISTS idx_tokens_mint ON tokens(mint);
 CREATE INDEX IF NOT EXISTS idx_tokens_status ON tokens(status);
+CREATE INDEX IF NOT EXISTS idx_tokens_is_on_curve ON tokens(is_on_curve);
 CREATE INDEX IF NOT EXISTS idx_tokens_blocktime ON tokens(blocktime DESC NULLS LAST);
 CREATE INDEX IF NOT EXISTS idx_tokens_created_at ON tokens(created_at);
 CREATE INDEX IF NOT EXISTS idx_marketcaps_token_id ON marketcaps(token_id);

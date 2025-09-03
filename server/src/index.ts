@@ -1,9 +1,12 @@
 import http from 'http';
 import dotenv from 'dotenv';
+import { Connection } from '@solana/web3.js';
 import app from './app';
 import { MintWatcherService } from './services/mintWatcher';
 import { MarketcapUpdaterService } from './services/marketcapUpdater';
+import { MetadataEnricherService } from './services/metadataEnricherService';
 import db from './db/connection';
+import { tokenRepository } from './db/repository';
 import { logger } from './utils/logger';
 
 dotenv.config();
@@ -26,6 +29,10 @@ if (!HELIUS_RPC_URL) {
 // Initialize services
 const mintWatcher = new MintWatcherService(HELIUS_RPC_URL);
 const marketcapUpdater = new MarketcapUpdaterService(JUPITER_API_KEY, BIRDEYE_API_KEY);
+const metadataEnricher = new MetadataEnricherService(
+    new Connection(HELIUS_RPC_URL, 'confirmed'),
+    tokenRepository
+);
 
 // Graceful shutdown function
 const gracefulShutdown = async (signal: string) => {
@@ -35,6 +42,7 @@ const gracefulShutdown = async (signal: string) => {
         // Stop all services
         await mintWatcher.stop();
         await marketcapUpdater.stop();
+        await metadataEnricher.stop();
         
         // Close database connections
         await db.close();
@@ -98,10 +106,14 @@ const startServer = async () => {
         await marketcapUpdater.start();
         logger.info('✅ Marketcap Updater: Price updates every 30 seconds');
         
+        // Start metadata enricher service
+        await metadataEnricher.start();
+        logger.info('✅ Metadata Enricher: Enriching tokens every 10 seconds');
+        
         logger.info('🚀 Solana Mint Discovery System started successfully!');
         logger.info('🔍 Watching for new token mints via Helius WebSocket');
         logger.info('💰 Tracking marketcap from Jupiter, Birdeye, and DexScreener');
-        logger.info('📊 Tokens progress: fresh → active (when liquidity > $1000)');
+        logger.info('📊 Tokens progress: fresh → curve → active (when migrating to AMM)');
 
         // Start HTTP server
         server.listen(PORT, () => {
