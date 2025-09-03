@@ -2,6 +2,7 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { useSolanaData } from "@/hooks/useSolanaData";
 
 // Dynamically import all components to avoid SSR issues
 const BackgroundVideo = dynamic(() => import("@/components/BackgroundVideo"), { ssr: false });
@@ -23,6 +24,21 @@ export default function Page() {
   const [isOracleHubOpen, setIsOracleHubOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Solana monitoring - runs continuously regardless of Scope state
+  const {
+    tokens,
+    isLoading: solanaLoading,
+    lastUpdate,
+    stats,
+    connectionStatus,
+    currentRpc,
+    hot,
+    live,
+    pendingCount,
+    resumeLive,
+    pauseLive,
+  } = useSolanaData(true); // Always true to keep monitoring active
+
   // Debug logging for state changes
   useEffect(() => {
     console.log("🎯 STATE CHANGED - isScopeOpen:", isScopeOpen, "isNavigationHubOpen:", isNavigationHubOpen, "isOracleHubOpen:", isOracleHubOpen);
@@ -39,6 +55,9 @@ export default function Page() {
   useEffect(() => {
     const savedBirthday = localStorage.getItem('userBirthday');
     const savedZodiacSign = localStorage.getItem('zodiacSign');
+    const savedScopeOpen = localStorage.getItem('isScopeOpen');
+    const savedNavigationOpen = localStorage.getItem('isNavigationHubOpen');
+    const savedOracleOpen = localStorage.getItem('isOracleHubOpen');
     
     if (savedBirthday && savedZodiacSign) {
       setUserBirthday(new Date(savedBirthday));
@@ -47,6 +66,17 @@ export default function Page() {
     } else {
       // If no saved data, still set loading to false so we can show birthday entry
       setShowMainPage(false);
+    }
+    
+    // Restore UI states from localStorage
+    if (savedScopeOpen) {
+      setIsScopeOpen(savedScopeOpen === 'true');
+    }
+    if (savedNavigationOpen) {
+      setIsNavigationHubOpen(savedNavigationOpen === 'true');
+    }
+    if (savedOracleOpen) {
+      setIsOracleHubOpen(savedOracleOpen === 'true');
     }
     
     setIsLoading(false);
@@ -84,19 +114,26 @@ export default function Page() {
     setShowMainPage(true);
   };
 
+  // Functions to save UI states to localStorage
+  const saveScopeState = (isOpen: boolean) => {
+    setIsScopeOpen(isOpen);
+    localStorage.setItem('isScopeOpen', isOpen.toString());
+  };
+
+  const saveNavigationState = (isOpen: boolean) => {
+    setIsNavigationHubOpen(isOpen);
+    localStorage.setItem('isNavigationHubOpen', isOpen.toString());
+  };
+
+  const saveOracleState = (isOpen: boolean) => {
+    setIsOracleHubOpen(isOpen);
+    localStorage.setItem('isOracleHubOpen', isOpen.toString());
+  };
+
   // Show loading state while checking localStorage
   if (isLoading) {
     return <div className="fixed inset-0 bg-black flex items-center justify-center">
       <div className="text-white text-xl">Loading...</div>
-      <button 
-        onClick={() => {
-          localStorage.clear();
-          window.location.reload();
-        }}
-        className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded border border-white/20"
-      >
-        Reset App (Debug)
-      </button>
     </div>;
   }
 
@@ -120,25 +157,29 @@ export default function Page() {
         <CornerLogo size={64} isVisible={!isScopeOpen && !isNavigationHubOpen && !isOracleHubOpen} />
         <RadialVideoButtons 
           isNavigationHubOpen={isNavigationHubOpen}
-          setIsNavigationHubOpen={setIsNavigationHubOpen}
+          setIsNavigationHubOpen={saveNavigationState}
           isScopeOpen={isScopeOpen}
-          setIsScopeOpen={setIsScopeOpen}
+          setIsScopeOpen={saveScopeState}
           isOracleHubOpen={isOracleHubOpen}
-          setIsOracleHubOpen={setIsOracleHubOpen}
+          setIsOracleHubOpen={saveOracleState}
         />
         
-        {/* DEBUG: Test button to manually open Scope */}
-        <button
-          onClick={() => {
-            console.log("🎯 DEBUG BUTTON CLICKED - Manually setting isScopeOpen to true");
-            setIsScopeOpen(true);
-          }}
-          className="fixed top-4 right-4 z-50 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-        >
-          DEBUG: Open Scope
-        </button>
+
         <BottomNavigation isNavigationHubOpen={isNavigationHubOpen} isOracleHubOpen={isOracleHubOpen} />
-        <Scope isOpen={isScopeOpen} />
+        <Scope 
+          isOpen={isScopeOpen}
+          tokens={tokens}
+          isLoading={solanaLoading}
+          lastUpdate={lastUpdate}
+          stats={stats}
+          connectionStatus={connectionStatus}
+          currentRpc={currentRpc}
+          hot={hot}
+          live={live}
+          pendingCount={pendingCount}
+          resumeLive={resumeLive}
+          pauseLive={pauseLive}
+        />
       </main>
     </ErrorBoundary>
   );

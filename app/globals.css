@@ -43,6 +43,7 @@
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+  font-family: 'VT323', monospace;
 }
 
 html,
@@ -50,6 +51,7 @@ body {
   max-width: 100vw;
   overflow-x: hidden;
   background: radial-gradient(circle at center bottom, #000000, #111111);
+  font-family: 'VT323', monospace;
 }
 
 body {
@@ -60,11 +62,17 @@ body {
       rgb(var(--background-end-rgb))
     )
     rgb(var(--background-start-rgb));
+  font-family: 'VT323', monospace;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+}
+
+/* Ensure VT323 font is applied to all text elements */
+h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
+  font-family: 'VT323', monospace;
 }
 
 @media (prefers-color-scheme: dark) {

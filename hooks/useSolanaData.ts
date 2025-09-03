@@ -53,6 +53,21 @@ interface Stats {
   totalLiquidity: number;
 }
 
+// Global state to persist across component re-renders - NEVER CLEANED UP
+let globalConnection: Connection | null = null;
+let globalSubscriptions = new Set<number>();
+let globalTokens: TokenData[] = [];
+let globalStats = {
+  totalTokens: 0,
+  newTokens: 0,
+  activeTokens: 0,
+  totalVolume: 0,
+  totalLiquidity: 0,
+};
+
+// Global flag to ensure connection is started only once
+let globalConnectionStarted = false;
+
 export const useSolanaData = (isOpen: boolean) => {
   const [tokens, setTokens] = useState<TokenData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,22 +78,25 @@ export const useSolanaData = (isOpen: boolean) => {
   const [live, setLive] = useState<boolean>(true);
 
   // Refs
-  const connectionRef = useRef<Connection | null>(null);
-  const activeSubscriptions = useRef<Set<number>>(new Set());
+  const connectionRef = useRef<Connection | null>(globalConnection);
+  const activeSubscriptions = useRef<Set<number>>(globalSubscriptions);
   const seenSignatures = useRef<Set<string>>(new Set());
   const seenMints = useRef<Set<string>>(new Set());
   const pendingAddsRef = useRef<string[]>([]);
   const visibleMintsRef = useRef<Set<string>>(new Set());
   const mintCreatedAtRef = useRef<Map<string, number>>(new Map());
 
-  // Stats
-  const [stats, setStats] = useState<Stats>({
-    totalTokens: 0,
-    newTokens: 0,
-    activeTokens: 0,
-    totalVolume: 0,
-    totalLiquidity: 0,
-  });
+  // Stats - use global state
+  const [stats, setStats] = useState<Stats>(globalStats);
+
+  // Sync local state with global state on mount
+  useEffect(() => {
+    if (globalTokens.length > 0) {
+      setTokens(globalTokens);
+      setLastUpdate(new Date());
+      console.log("🔄 Synced local state with global state:", globalTokens.length, "tokens");
+    }
+  }, []);
 
   // 1) Replace getTokenMetadata with direct JSON-RPC + PDA fallback
   const getTokenMetadata = useCallback(async (mint: string) => {
@@ -210,6 +228,47 @@ export const useSolanaData = (isOpen: boolean) => {
 
   // 3) Listen only to InitializeMint, remove Raydium/Orca/Pump.fun listeners for now
   const startSolanaDataStream = useCallback(async () => {
+    // Prevent restarting if already running globally
+    if (globalConnectionStarted) {
+      console.log("🔄 Global connection already started, skipping restart");
+      return;
+    }
+    
+    // Prevent restarting if already running
+    if (connectionRef.current && activeSubscriptions.current.size > 0) {
+      console.log("🔄 Stream already running, skipping restart");
+      return;
+    }
+
+    // If connection exists but no subscriptions, just add the subscription
+    if (connectionRef.current && activeSubscriptions.current.size === 0) {
+      console.log("🔄 Connection exists, adding subscription...");
+      try {
+        const splTokenSubId = connectionRef.current.onLogs(
+          TOKEN_PROGRAM_ID,
+          async (logs) => {
+            if (logs.err) return;
+            const hasInitializeMint = logs.logs.some(
+              (l) => l.includes("Instruction: InitializeMint") || l.includes("Instruction: InitializeMint2")
+            );
+            if (!hasInitializeMint) return;
+
+            const mintAddress = await findMintFromInitMint(logs.signature);
+            if (mintAddress) {
+              await processNewToken(mintAddress, logs.signature);
+            }
+          },
+          "confirmed"
+        );
+
+        activeSubscriptions.current.add(splTokenSubId);
+        console.log("✅ SPL Token subscription added to existing connection");
+        return;
+      } catch (error) {
+        console.error("❌ Failed to add subscription to existing connection:", error);
+      }
+    }
+
     try {
       console.log("🚀 Starting Solana data stream...");
 
@@ -242,6 +301,10 @@ export const useSolanaData = (isOpen: boolean) => {
 
       activeSubscriptions.current.add(splTokenSubId);
       console.log("✅ SPL Token subscription started (mints only)");
+      
+      // Mark global connection as started - NEVER RESET
+      globalConnectionStarted = true;
+      console.log("🌐 Global connection marked as started - will persist forever");
 
       console.log("🔍 Waiting for new mints...");
     } catch (error) {
@@ -251,28 +314,33 @@ export const useSolanaData = (isOpen: boolean) => {
     }
   }, [processNewToken, findMintFromInitMint]);
 
-  // Cleanup
-  const cleanup = useCallback(() => {
-    console.log("🧹 Cleaning up subscriptions...");
-    activeSubscriptions.current.forEach(subId => {
-      try {
-        connectionRef.current?.removeOnLogsListener(subId);
-      } catch (error) {
-        console.log("❌ Error cleaning up subscription:", error);
-      }
-    });
-    activeSubscriptions.current.clear();
-  }, []);
+  // NO CLEANUP - Keep connection running forever
+  // const cleanup = useCallback(() => {
+  //   console.log("🧹 Cleaning up subscriptions...");
+  //   activeSubscriptions.current.forEach(subId => {
+  //     try {
+  //       connectionRef.current?.removeOnLogsListener(subId);
+  //     } catch (error) {
+  //       console.log("❌ Error cleaning up subscription:", error);
+  //     }
+  //   });
+  //   activeSubscriptions.current.clear();
+  // }, []);
 
-  // 4) Keep your useEffect simple and ensure cleanup
+  // 4) Start the stream once and keep it running
   useEffect(() => {
-    if (isOpen) {
-      const t = setTimeout(() => { startSolanaDataStream(); }, 200);
-      return () => { clearTimeout(t); cleanup(); };
-    } else {
-      cleanup();
-    }
-  }, [isOpen, startSolanaDataStream, cleanup]);
+    // Start the stream immediately and keep it running
+    const t = setTimeout(() => { startSolanaDataStream(); }, 200);
+    
+    // NEVER cleanup the connection - keep it running forever
+    // return () => { clearTimeout(t); };
+    
+    // Only clear the timeout, don't cleanup the connection
+    return () => { 
+      clearTimeout(t); 
+      // DO NOT cleanup subscriptions or connection
+    };
+  }, [startSolanaDataStream]); // Remove isOpen dependency
 
   // Resume live updates
   const resumeLive = useCallback(() => {
@@ -285,6 +353,13 @@ export const useSolanaData = (isOpen: boolean) => {
     setLive(false);
     console.log("⏸️ Live updates paused");
   }, []);
+
+  // NEVER cleanup the global connection - keep it running forever
+  // useEffect(() => {
+  //   return () => {
+  //     // DO NOT cleanup - keep connection alive
+  //   };
+  // }, []);
 
   return {
     tokens,
