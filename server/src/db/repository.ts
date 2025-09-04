@@ -172,11 +172,6 @@ export class TokenRepository {
         return result.rows[0]?.count || 0;
     }
 
-    async updateTokenStatus(id: number, status: 'fresh' | 'active' | 'curve'): Promise<void> {
-        const query = 'UPDATE tokens SET status = $1 WHERE id = $2';
-        await db.query(query, [status, id]);
-        logger.info(`Updated token ${id} status to ${status}`);
-    }
 
     async updateTokenMetadata(
         id: number, 
@@ -286,6 +281,87 @@ export class TokenRepository {
         const result = await db.query(query);
         return result.rows;
     }
+
+    async getTokensByStatus(status: 'fresh' | 'active' | 'curve'): Promise<Token[]> {
+        const query = `
+            SELECT * FROM tokens 
+            WHERE status = $1 
+            ORDER BY created_at DESC
+        `;
+        const result = await db.query(query, [status]);
+        return result.rows;
+    }
+
+    async updateTokenStatus(mint: string, status: 'fresh' | 'active' | 'curve'): Promise<void> {
+        const query = `
+            UPDATE tokens 
+            SET status = $1, updated_at = NOW()
+            WHERE mint = $2
+        `;
+        await db.query(query, [status, mint]);
+    }
+
+    // Insert or replace all holders for a mint in one tx
+    async upsertTokenHoldersByMint(mint: string, rows: { owner: string; amount: number; raw_amount: string }[]) {
+        const client = await db.getClient();
+        try {
+            await client.query("BEGIN");
+            await client.query("DELETE FROM token_holders WHERE mint = $1", [mint]);
+
+            if (rows.length) {
+                // bulk insert
+                const values: string[] = [];
+                const params: any[] = [];
+                rows.forEach((r, i) => {
+                    const p = i * 4;
+                    values.push(`($${p+1}, $${p+2}, $${p+3}, $${p+4})`);
+                    params.push(mint, r.owner, r.amount, r.raw_amount);
+                });
+                await client.query(
+                    `INSERT INTO token_holders (mint, owner, amount, raw_amount) VALUES ${values.join(",")}`,
+                    params
+                );
+            }
+
+            await client.query(
+                `INSERT INTO token_holder_summary(mint, holder_count, updated_at)
+                 VALUES ($1, $2, NOW())
+                 ON CONFLICT (mint) DO UPDATE SET holder_count = EXCLUDED.holder_count, updated_at = NOW()`,
+                [mint, rows.length]
+            );
+
+            await client.query("COMMIT");
+        } catch (e) {
+            await client.query("ROLLBACK");
+            throw e;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getTopHolders(mint: string, limit = 50) {
+        const { rows } = await db.query(
+            `SELECT owner, amount FROM token_holders WHERE mint = $1 ORDER BY amount DESC LIMIT $2`,
+            [mint, limit]
+        );
+        return rows;
+    }
+
+    async getWalletPositions(owner: string, minAmount = 0) {
+        const { rows } = await db.query(
+            `SELECT mint, amount FROM token_holders WHERE owner = $1 AND amount > $2 ORDER BY amount DESC`,
+            [owner, minAmount]
+        );
+        return rows;
+    }
+
+    async findRecentActiveMints(limit = 50): Promise<string[]> {
+        const { rows } = await db.query(
+            `SELECT mint FROM tokens WHERE status = 'active' ORDER BY updated_at DESC LIMIT $1`,
+            [limit]
+        );
+        return rows.map((r: any) => r.mint);
+    }
 }
 
 export class MarketCapRepository {
@@ -323,6 +399,7 @@ export class MarketCapRepository {
         const result = await db.query(query, [tokenId, limit]);
         return result.rows;
     }
+
 }
 
 // Export singleton instances

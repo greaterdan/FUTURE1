@@ -2,6 +2,18 @@ import { Connection } from '@solana/web3.js';
 import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { tokenRepository } from '../db/repository';
 import { logger } from '../utils/logger';
+// Import wsService dynamically to avoid circular dependency
+let wsService: any = null;
+const getWsService = () => {
+    if (!wsService) {
+        try {
+            wsService = require('../app').wsService;
+        } catch (error) {
+            console.warn('WebSocket service not available:', error);
+        }
+    }
+    return wsService;
+};
 
 export class MintWatcherService {
     private connection: Connection;
@@ -92,7 +104,7 @@ export class MintWatcherService {
             }
 
             // Save to database
-            await tokenRepository.createToken(
+            const newToken = await tokenRepository.createToken(
                 mintInfo.mint,
                 mintInfo.decimals,
                 mintInfo.supply,
@@ -107,6 +119,14 @@ export class MintWatcherService {
             );
 
             logger.info(`Successfully processed mint: ${mintInfo.mint} (${mintInfo.decimals} decimals)`);
+            
+            // Broadcast new token to all connected WebSocket clients
+            if (newToken) {
+                const ws = getWsService();
+                if (ws) {
+                    ws.broadcastNewToken(newToken);
+                }
+            }
             
         } catch (error) {
             logger.error(`Error processing InitializeMint transaction ${signature}:`, error);

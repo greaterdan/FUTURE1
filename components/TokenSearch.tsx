@@ -223,7 +223,7 @@ export default function TokenSearch({ onTokenSelect, placeholder = "Search by to
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
                     {token.image_url ? (
                       <ImageWithFallback
-                        src={token.image_url}
+                        src={`http://localhost:8080/api/img?u=${encodeURIComponent(token.image_url)}`}
                         alt={token.name || token.symbol || 'Token'}
                         className="w-full h-full object-cover"
                         fallback={

@@ -1,9 +1,21 @@
 import { getOnchainMetadata } from "../lib/onchainMetadata";
-import { resolveImageUrl } from "../lib/offchainMetadata";
+import { resolveImageUrl, toHttp } from "../lib/offchainMetadata";
 import { TokenRepository } from "../db/repository";
 import { Connection } from "@solana/web3.js";
 import { logger } from "../utils/logger";
 import * as cron from "node-cron";
+// Import wsService dynamically to avoid circular dependency
+let wsService: any = null;
+const getWsService = () => {
+    if (!wsService) {
+        try {
+            wsService = require('../app').wsService;
+        } catch (error) {
+            console.warn('WebSocket service not available:', error);
+        }
+    }
+    return wsService;
+};
 
 export class MetadataEnricherService {
   private cronJob?: cron.ScheduledTask;
@@ -22,8 +34,8 @@ export class MetadataEnricherService {
 
     logger.info("Starting Metadata Enricher Service...");
     
-    // Start cron job to enrich tokens every 10 seconds
-    this.cronJob = cron.schedule("*/10 * * * * *", async () => {
+    // Start cron job to enrich tokens every 5 seconds for live mint detection
+    this.cronJob = cron.schedule("*/5 * * * * *", async () => {
       try {
         await this.enrichTokens(50); // Process 50 tokens at a time
       } catch (error) {
@@ -84,60 +96,95 @@ export class MetadataEnricherService {
   async enrichToken(mint: string) {
     const maxRetries = 3;
     let attempt = 0;
-    
+
     while (attempt < maxRetries) {
       try {
         attempt++;
         logger.debug(`Enriching metadata for ${mint} (attempt ${attempt}/${maxRetries})`);
-        
+
+        // 1) On-chain first
         const onchain = await getOnchainMetadata(this.conn, mint);
-        
+
+        // Persist name/symbol/uri immediately if present
         if (onchain.name || onchain.symbol || onchain.uri) {
           await this.repo.updateTokenMetadataByMint(mint, {
             name: onchain.name,
             symbol: onchain.symbol,
             metadata_uri: onchain.uri,
           });
-          
-          logger.info(`✅ Metadata enriched: ${onchain.name || 'Unknown'} (${onchain.symbol || 'Unknown'}) from ${onchain.uri || 'on-chain'}`);
-          
-          // Try to fill image_url (don't fail the whole job if fetch is down)
-          if (onchain.uri) {
-            const img = await resolveImageUrl(onchain.uri).catch(() => undefined);
-            if (img) {
-              await this.repo.updateTokenMetadataByMint(mint, { image_url: img });
-              logger.debug(`Resolved image for ${mint}: ${img}`);
-            }
-          }
-          
-          return; // Success, exit retry loop
-        } else {
-          // Try Helius fallback if on-chain metadata is missing
-          logger.debug(`No on-chain metadata found for ${mint}, trying Helius fallback...`);
-          const heliusMetadata = await this.tryHeliusFallback(mint);
-          
-          if (heliusMetadata.name || heliusMetadata.symbol) {
-            await this.repo.updateTokenMetadataByMint(mint, {
-              name: heliusMetadata.name,
-              symbol: heliusMetadata.symbol,
-              metadata_uri: heliusMetadata.uri,
-              image_url: heliusMetadata.image
-            });
-            
-            logger.info(`✅ Metadata enriched via Helius fallback: ${heliusMetadata.name || 'Unknown'} (${heliusMetadata.symbol || 'Unknown'})`);
-            return;
-          }
-          
-          logger.debug(`No metadata found for ${mint} via any method`);
-          return; // No metadata available, don't retry
+          logger.info(`✅ Metadata enriched: ${onchain.name || "Unknown"} (${onchain.symbol || "Unknown"}) from ${onchain.uri || "on-chain"}`);
         }
+
+        // Try resolve image from on-chain data first
+        let resolvedImg: string | undefined;
+
+        // (a) direct image returned by onchain fetcher
+        if (onchain.image) {
+          const http = toHttp(onchain.image) ?? onchain.image;
+          if (http?.startsWith("http")) resolvedImg = http;
+        }
+
+        // (b) resolve via metadata URI
+        if (!resolvedImg && onchain.uri) {
+          resolvedImg = await resolveImageUrl(onchain.uri).catch(() => undefined);
+        }
+
+        // 2) If nothing on-chain, try Helius fallback (and also try to resolve its image/uri)
+        let heliusMetadata: { name?: string; symbol?: string; uri?: string; image?: string } = {};
+        if ((!onchain.name && !onchain.symbol && !onchain.uri) || !resolvedImg) {
+          if (!onchain.name && !onchain.symbol && !onchain.uri) {
+            logger.debug(`No on-chain metadata found for ${mint}, trying Helius fallback...`);
+          } else {
+            logger.debug(`No image from on-chain for ${mint}, trying Helius fallback for image...`);
+          }
+
+          heliusMetadata = await this.tryHeliusFallback(mint);
+
+          // If Helius provided name/symbol/uri we didn't have, upsert them
+          if (heliusMetadata.name || heliusMetadata.symbol || heliusMetadata.uri) {
+            await this.repo.updateTokenMetadataByMint(mint, {
+              name: onchain.name ?? heliusMetadata.name,
+              symbol: onchain.symbol ?? heliusMetadata.symbol,
+              metadata_uri: onchain.uri ?? heliusMetadata.uri,
+            });
+            logger.info(`✅ Metadata enriched via Helius fallback: ${heliusMetadata.name || onchain.name || "Unknown"} (${heliusMetadata.symbol || onchain.symbol || "Unknown"})`);
+          }
+
+          // (c) direct image from helius
+          if (!resolvedImg && heliusMetadata.image) {
+            const http = toHttp(heliusMetadata.image) ?? heliusMetadata.image;
+            if (http?.startsWith("http")) resolvedImg = http;
+          }
+
+          // (d) resolve via helius json_uri
+          if (!resolvedImg && heliusMetadata.uri) {
+            resolvedImg = await resolveImageUrl(heliusMetadata.uri).catch(() => undefined);
+          }
+        }
+
+        // 3) Save image if resolved
+        if (resolvedImg) {
+          await this.repo.updateTokenMetadataByMint(mint, { image_url: resolvedImg });
+          logger.debug(`🖼️  Image set for ${mint}: ${resolvedImg}`);
+        } else {
+          logger.debug(`No image could be resolved for ${mint}`);
+        }
+
+        // Broadcast token update to WebSocket clients
+        // Note: We'll broadcast the update with the mint address
+        const ws = getWsService();
+        if (ws) {
+            ws.broadcastTokenUpdate({ mint, updated: true });
+        }
+
+        return; // done
+
       } catch (error) {
         if (attempt === maxRetries) {
           logger.error(`Failed to enrich token ${mint} after ${maxRetries} attempts:`, error);
         } else {
           logger.warn(`⚠️ Metadata enrichment failed for ${mint} (attempt ${attempt}/${maxRetries}), retrying...`);
-          // Exponential backoff: wait 1s, 2s, 4s
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+          await new Promise(r => setTimeout(r, Math.pow(2, attempt - 1) * 1000));
         }
       }
     }
@@ -145,64 +192,32 @@ export class MetadataEnricherService {
   
   // Helius fallback for tokens with invalid on-chain metadata
   private async tryHeliusFallback(mint: string): Promise<{ name?: string; symbol?: string; uri?: string; image?: string }> {
+    const apiKey = process.env.HELIUS_API_KEY || process.env.HELIUS_KEY || "";
+    if (!apiKey) {
+      logger.warn("HELIUS_API_KEY not set; skipping fallback");
+      return {};
+    }
     try {
-      // Get Helius API key from environment
-      const heliusApiKey = process.env.HELIUS_API_KEY;
-      if (!heliusApiKey) {
-        logger.debug(`Helius API key not configured, skipping fallback for ${mint}`);
-        return {};
-      }
-
-      logger.debug(`Trying Helius fallback for ${mint}...`);
-      
-      const response = await fetch("https://mainnet.helius-rpc.com/?api-key=" + heliusApiKey, {
+      const resp = await fetch(`https://mainnet.helius-rpc.com/?api-key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: "metadata-fallback",
+          id: "get-asset",
           method: "getAsset",
           params: { id: mint }
         })
       });
+      if (!resp.ok) return {};
+      const { result } = await resp.json() as any;
 
-      if (!response.ok) {
-        logger.warn(`Helius API request failed with status ${response.status} for ${mint}`);
-        return {};
-      }
+      const name = result?.content?.metadata?.name ?? result?.content?.metadata?.token_standard?.name;
+      const symbol = result?.content?.metadata?.symbol ?? result?.content?.metadata?.token_standard?.symbol;
+      const jsonUri = result?.content?.json_uri;
+      const image = result?.content?.links?.image;
 
-      const data = await response.json() as any;
-      const { result, error } = data;
-      
-      if (error) {
-        logger.warn(`Helius API error for ${mint}:`, error);
-        return {};
-      }
-
-      if (!result) {
-        logger.debug(`No Helius result for ${mint}`);
-        return {};
-      }
-
-      // Extract metadata from Helius response
-      const metadata = {
-        name: result?.content?.metadata?.name,
-        symbol: result?.content?.metadata?.symbol,
-        uri: result?.content?.json_uri,
-        image: result?.content?.links?.image || result?.content?.files?.[0]?.uri
-      };
-
-      // Validate that we got useful data
-      if (metadata.name || metadata.symbol) {
-        logger.info(`✅ Helius fallback successful for ${mint}: ${metadata.name || 'Unknown'} (${metadata.symbol || 'Unknown'})`);
-        return metadata;
-      } else {
-        logger.debug(`Helius fallback returned no useful metadata for ${mint}`);
-        return {};
-      }
-
-    } catch (error) {
-      logger.warn(`Helius fallback failed for ${mint}:`, error);
+      return { name, symbol, uri: jsonUri, image };
+    } catch (e) {
       return {};
     }
   }

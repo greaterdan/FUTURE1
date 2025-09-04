@@ -9,7 +9,7 @@ interface MarketData {
 }
 
 export class MarketcapUpdaterService {
-    private isRunning: boolean = false;
+    private isRunning: boolean = false; 
     private intervalId: NodeJS.Timeout | null = null;
     private jupiterApiKey: string;
     private birdeyeApiKey: string;
@@ -67,27 +67,27 @@ export class MarketcapUpdaterService {
         try {
             logger.info('Starting marketcap update cycle...');
             
-            // Get only AMM tokens that need pricing (exclude curve tokens)
+            // Get only specific token types: Pump.fun, BONK, BAGS, and Raydium tokens
             const tokens = await tokenRepository.getAllTokens();
-            const ammTokens = tokens.filter(t => !t.is_on_curve && t.status !== 'curve');
+            const targetTokens = tokens.filter(t => this.isTargetToken(t));
             
-            logger.info(`Found ${ammTokens.length} AMM tokens for pricing (excluding curve tokens)`);
+            logger.info(`Found ${targetTokens.length} target tokens (Pump.fun, BONK, BAGS, Raydium) for pricing`);
             
-            // Update AMM tokens with price data
-            if (ammTokens.length > 0) {
-                logger.info(`Updating marketcap for ${ammTokens.length} AMM tokens`);
+            // Update target tokens with price data
+            if (targetTokens.length > 0) {
+                logger.info(`Updating marketcap for ${targetTokens.length} target tokens`);
                 
                 // Update tokens in parallel with rate limiting
                 const batchSize = 5; // Process 5 tokens at a time to avoid rate limits
-                for (let i = 0; i < ammTokens.length; i += batchSize) {
-                    const batch = ammTokens.slice(i, i + batchSize);
+                for (let i = 0; i < targetTokens.length; i += batchSize) {
+                    const batch = targetTokens.slice(i, i + batchSize);
                     
                     await Promise.all(
                         batch.map(token => this.updateTokenMarketcap(token.mint, token.id))
                     );
                     
                     // Small delay between batches to avoid rate limits
-                    if (i + batchSize < ammTokens.length) {
+                    if (i + batchSize < targetTokens.length) {
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
                 }
@@ -98,6 +98,38 @@ export class MarketcapUpdaterService {
         } catch (error) {
             logger.error('Error in marketcap update cycle:', error);
         }
+    }
+
+    private isTargetToken(token: any): boolean {
+        // Check if token is a Pump.fun token (bonding curve)
+        if (token.is_on_curve || token.bonding_curve_address) {
+            return true;
+        }
+        
+        // Check if token is BONK
+        if (token.mint === 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263' || 
+            token.symbol?.toLowerCase() === 'bonk' ||
+            token.name?.toLowerCase().includes('bonk')) {
+            return true;
+        }
+        
+        // Check if token is BAGS
+        if (token.symbol?.toLowerCase() === 'bags' ||
+            token.name?.toLowerCase().includes('bags')) {
+            return true;
+        }
+        
+        // Check if token is from Raydium (common Raydium token patterns)
+        if (token.mint.includes('raydium') ||
+            token.metadata_uri?.includes('raydium') ||
+            token.name?.toLowerCase().includes('raydium')) {
+            return true;
+        }
+        
+        // Check for other specific token patterns you want to track
+        // Add more conditions here as needed
+        
+        return false;
     }
 
     private async updateTokenMarketcap(contractAddress: string, tokenId: number): Promise<void> {

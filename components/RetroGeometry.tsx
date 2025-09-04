@@ -31,7 +31,6 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false, is
     scopeOpenRef.current = isScopeOpen; 
     // Track state changes for animation
     if (isScopeOpen !== previousScopeStateRef.current) {
-      console.log('🎯 SCOPE PROP CHANGED:', isScopeOpen ? 'OPENED' : 'CLOSED', 'From:', previousScopeStateRef.current, 'To:', isScopeOpen);
       previousScopeStateRef.current = isScopeOpen;
     }
   }, [isScopeOpen]);
@@ -108,9 +107,8 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false, is
         const isOracleOpen = oracleOpenRef.current;
         const isScopeOpen = scopeOpenRef.current;
         
-        // Debug: Log Scope state changes
+        // Track Scope state changes
         if (isScopeOpen !== previousScopeStateRef.current) {
-          console.log('🎯 SCOPE STATE CHANGED:', isScopeOpen ? 'OPENED' : 'CLOSED', 'From:', previousScopeStateRef.current, 'To:', isScopeOpen);
           previousScopeStateRef.current = isScopeOpen;
         }
 
@@ -137,15 +135,6 @@ export default function RetroGeometry({ isSlow = false, isOracleOpen = false, is
         const smoothedTarget = p.lerp(currentScopeScale, targetScopeScale, 0.1); // Pre-smooth the target
         currentScopeScale = p.lerp(currentScopeScale, smoothedTarget, clampedSpeed);
         
-        // Debug: Log current values in draw loop
-        if (Math.abs(currentScopeScale - targetScopeScale) > 0.1) {
-          console.log('🎯 DRAW LOOP DEBUG:', 'isScopeOpen:', isScopeOpen, 'scopeOpenRef.current:', scopeOpenRef.current, 'currentScale:', currentScopeScale.toFixed(2));
-        }
-        
-        // Debug: Log the animation state
-        if (Math.abs(currentScopeScale - targetScopeScale) > 0.1) {
-          console.log('🎯 SCOPE ANIMATION:', isScopeOpen ? 'OPENING' : 'CLOSING', 'Current:', currentScopeScale.toFixed(2), 'Target:', targetScopeScale.toFixed(2));
-        }
         
 
         

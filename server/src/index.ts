@@ -1,10 +1,11 @@
-import http from 'http';
 import dotenv from 'dotenv';
 import { Connection } from '@solana/web3.js';
-import app from './app';
+import { server } from './app';
 import { MintWatcherService } from './services/mintWatcher';
 import { MarketcapUpdaterService } from './services/marketcapUpdater';
 import { MetadataEnricherService } from './services/metadataEnricherService';
+import { TokenStatusUpdaterService } from './services/tokenStatusUpdater';
+import { HolderIndexer } from './services/holderIndexer';
 import db from './db/connection';
 import { tokenRepository } from './db/repository';
 import { logger } from './utils/logger';
@@ -13,8 +14,7 @@ dotenv.config();
 
 const PORT = process.env.PORT || 8080;
 
-// Create HTTP server
-const server = http.createServer(app);
+// Server is now imported from app.ts with WebSocket support
 
 // Get required environment variables
 const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL;
@@ -27,12 +27,12 @@ if (!HELIUS_RPC_URL) {
 }
 
 // Initialize services
+const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
 const mintWatcher = new MintWatcherService(HELIUS_RPC_URL);
 const marketcapUpdater = new MarketcapUpdaterService(JUPITER_API_KEY, BIRDEYE_API_KEY);
-const metadataEnricher = new MetadataEnricherService(
-    new Connection(HELIUS_RPC_URL, 'confirmed'),
-    tokenRepository
-);
+const metadataEnricher = new MetadataEnricherService(connection, tokenRepository);
+const tokenStatusUpdater = new TokenStatusUpdaterService();
+const holderIndexer = new HolderIndexer(connection, tokenRepository);
 
 // Graceful shutdown function
 const gracefulShutdown = async (signal: string) => {
@@ -43,6 +43,8 @@ const gracefulShutdown = async (signal: string) => {
         await mintWatcher.stop();
         await marketcapUpdater.stop();
         await metadataEnricher.stop();
+        await tokenStatusUpdater.stop();
+        holderIndexer.stop();
         
         // Close database connections
         await db.close();
@@ -108,7 +110,15 @@ const startServer = async () => {
         
         // Start metadata enricher service
         await metadataEnricher.start();
-        logger.info('✅ Metadata Enricher: Enriching tokens every 10 seconds');
+        logger.info('✅ Metadata Enricher: Enriching tokens every 5 seconds');
+        
+        // Start token status updater service
+        await tokenStatusUpdater.start();
+        logger.info('✅ Token Status Updater: Moving tokens between categories every 10 seconds');
+        
+        // Start holder indexer service
+        holderIndexer.start();
+        logger.info('✅ Holder Indexer: Indexing token holders every 2 minutes');
         
         logger.info('🚀 Solana Mint Discovery System started successfully!');
         logger.info('🔍 Watching for new token mints via Helius WebSocket');

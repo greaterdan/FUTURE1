@@ -2,7 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
 import tokenRoutes from './api/tokenRoutes';
+import { imageProxy } from './api/imageProxy';
+import { WebSocketService } from './api/websocket';
 import { logger } from './utils/logger';
 
 dotenv.config();
@@ -16,7 +19,7 @@ app.use(helmet());
 app.use(cors({
     origin: process.env.NODE_ENV === 'production' 
         ? ['https://yourdomain.com'] // Replace with your actual domain
-        : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:8080'],
+        : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003', 'http://localhost:3004', 'http://localhost:3005', 'http://localhost:3006', 'http://localhost:3007', 'http://localhost:3008', 'http://localhost:8080'],
     credentials: true
 }));
 
@@ -48,6 +51,7 @@ app.get('/health', (_req, res) => {
 
 // API routes
 app.use('/api/tokens', tokenRoutes);
+app.get('/api/img', imageProxy);
 
 // Root endpoint
 app.get('/', (_req, res) => {
@@ -93,4 +97,13 @@ app.use((error: any, _req: express.Request, res: express.Response, _next: expres
     });
 });
 
+// Create HTTP server
+const server = createServer(app);
+
+// Initialize WebSocket service
+const wsService = new WebSocketService(server);
+
+// Export both app and server
+export { wsService };
 export default app;
+export { server };

@@ -214,7 +214,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
         {/* Avatar container with HoverImagePreview */}
         <div className="relative h-9 w-9 shrink-0 overflow-visible">
           <HoverImagePreview 
-            src={token.image_url || token.image || `https://api.dicebear.com/8.x/shapes/svg?seed=${token.mint}`}
+            src={token.imageUrl ? `http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}` : `https://api.dicebear.com/8.x/shapes/svg?seed=${token.mint}`}
             alt={token.symbol || token.name || "Token"}
             thumbClass="h-full w-full object-cover rounded-md"
           />
@@ -225,7 +225,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           <h3 className="text-white font-semibold truncate">
             {token.name || token.symbol || `${token.mint.slice(0, 4)}…${token.mint.slice(-4)}`}
           </h3>
-          <div className="text-white/80 text-sm font-mono truncate">
+          <div className="text-white/80 text-sm font-mono font-bold truncate uppercase">
             {token.symbol || token.mint.slice(0, 4)}
           </div>
           {/* Creation time display */}
@@ -293,7 +293,7 @@ const shallowPickEq = (a: any, b: any) =>
   a.mint === b.mint &&
   a.name === b.name &&
   a.symbol === b.symbol &&
-  a.image_url === b.image_url &&
+  a.imageUrl === b.imageUrl &&
   a.is_on_curve === b.is_on_curve &&
   a.price_usd === b.price_usd &&
   a.liquidity === b.liquidity &&
@@ -605,11 +605,11 @@ export const Scope = ({
       isOnCurve: t.isOnCurve // Use transformed property name
     })));
     
-    // Use transformed property names from useServerData
-    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve);
-    const filled = tokensToFilter.filter(t => t && t.status === 'active');
-    const onEdge = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.liquidity && t.liquidity > 0);
-    const curveTokens = tokensToFilter.filter(t => t && (t.status === 'curve' || t.isOnCurve));
+    // Use transformed property names from useServerData and limit to 30 tokens each
+    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve).slice(0, 30);
+    const filled = tokensToFilter.filter(t => t && t.status === 'active').slice(0, 30);
+    const onEdge = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.liquidity && t.liquidity > 0).slice(0, 30);
+    const curveTokens = tokensToFilter.filter(t => t && (t.status === 'curve' || t.isOnCurve)).slice(0, 30);
     
     console.log("✅ Filtered tokens:", {
       newPairs: newPairs.length,

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useWebSocket } from "./useWebSocket";
 
 // Server API base URL
 const SERVER_BASE_URL = process.env.NODE_ENV === 'production' 
@@ -112,6 +113,12 @@ export const useServerData = (isOpen: boolean) => {
   });
   const [live, setLive] = useState<boolean>(true);
 
+  // WebSocket connection for real-time updates
+  const wsUrl = process.env.NODE_ENV === 'production' 
+    ? 'wss://yourdomain.com/ws' 
+    : 'ws://localhost:8080/ws';
+  const { isConnected: wsConnected, lastMessage } = useWebSocket(wsUrl);
+
   // Fetch tokens from server
   const fetchTokens = useCallback(async () => {
     try {
@@ -131,7 +138,7 @@ export const useServerData = (isOpen: boolean) => {
       const transformedTokens = items.map(transformTokenData);
       setTokens(transformedTokens);
       setLastUpdate(new Date());
-      setConnectionStatus("Connected to server");
+      setConnectionStatus(wsConnected ? "Connected to server (Live)" : "Connected to server");
       
       // Calculate stats from the data
       const newStats = {
@@ -210,16 +217,37 @@ export const useServerData = (isOpen: boolean) => {
     console.log("⏸️ Live updates paused");
   }, []);
 
-  // Initial fetch and periodic updates
+  // Handle WebSocket messages for real-time updates
+  useEffect(() => {
+    if (lastMessage) {
+      if (lastMessage.type === 'new_token') {
+        // Add new token to the list
+        const newToken = transformTokenData(lastMessage.data);
+        setTokens(prev => [newToken, ...prev]);
+        setLastUpdate(new Date());
+        console.log('🔥 NEW TOKEN ADDED:', newToken.name || newToken.symbol || newToken.mint);
+      } else if (lastMessage.type === 'token_update') {
+        // Update existing token
+        const updatedToken = transformTokenData(lastMessage.data);
+        setTokens(prev => prev.map(token => 
+          token.mint === updatedToken.mint ? updatedToken : token
+        ));
+        setLastUpdate(new Date());
+        console.log('🔄 TOKEN UPDATED:', updatedToken.name || updatedToken.symbol || updatedToken.mint);
+      }
+    }
+  }, [lastMessage]);
+
+  // Initial fetch and periodic updates (reduced frequency since we have WebSocket)
   useEffect(() => {
     if (isOpen) {
       fetchTokens();
       
-      // Set up periodic refresh when live mode is on
+      // Set up periodic refresh when live mode is on (less frequent since WebSocket handles real-time)
       if (live) {
         const interval = setInterval(() => {
           fetchTokens();
-        }, 15000); // Refresh every 15 seconds
+        }, 30000); // Refresh every 30 seconds for fallback
         
         return () => clearInterval(interval);
       }

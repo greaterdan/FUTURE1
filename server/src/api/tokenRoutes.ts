@@ -124,4 +124,30 @@ router.get('/search', async (req: Request, res: Response) => {
     }
 });
 
+// GET /tokens/:mint/holders - Top holders of a mint
+router.get('/:mint/holders', async (req: Request, res: Response) => {
+    try {
+        const { mint } = req.params;
+        const limit = Number(req.query.limit ?? 50);
+        const rows = await tokenRepository.getTopHolders(mint, limit);
+        res.json({ mint, holders: rows });
+    } catch (e) {
+        logger.error('Error fetching holders:', e);
+        res.status(500).json({ error: "failed to load holders" });
+    }
+});
+
+// GET /wallet/:owner/positions - Wallet positions
+router.get('/wallet/:owner/positions', async (req: Request, res: Response) => {
+    try {
+        const { owner } = req.params;
+        const min = Number(req.query.min ?? 0);
+        const rows = await tokenRepository.getWalletPositions(owner, min);
+        res.json({ owner, positions: rows });
+    } catch (e) {
+        logger.error('Error fetching wallet positions:', e);
+        res.status(500).json({ error: "failed to load positions" });
+    }
+});
+
 export default router;
