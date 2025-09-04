@@ -141,17 +141,12 @@ const WatchlistPopup: React.FC<{
                 >
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
-                      {token.imageUrl ? (
-                        <img
-                          src={`http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}`}
-                          alt={token.symbol || token.name || "Token"}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
-                          {token.symbol?.slice(0, 2) || token.mint.slice(0, 2)}
-                        </div>
-                      )}
+                      <ImageWithFallback
+                        src={token.imageUrl ? `http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}` : undefined}
+                        alt={token.symbol || token.name || "Token"}
+                        className="w-full h-full object-cover"
+                        fallbackClassName="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold"
+                      />
                     </div>
                     <div>
                       <div className="text-white font-semibold">
@@ -374,7 +369,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
   return (
     <div
       ref={cardRef}
-      className={`relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-105 hover:z-10 transition-all duration-200 token-card ${
+      className={`group relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-105 hover:z-10 transition-all duration-200 token-card ${
         isDragOver && !attachedCompanion
           ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]' 
           : 'border-white/10 bg-white/6'
@@ -461,7 +456,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
         {/* Avatar container with HoverImagePreview */}
         <div className="relative h-12 w-12 shrink-0 overflow-visible">
           <HoverImagePreview 
-            src={token.imageUrl ? `http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}` : `https://api.dicebear.com/8.x/shapes/svg?seed=${token.mint}`}
+            src={token.imageUrl ? `http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}` : undefined}
             alt={token.symbol || token.name || "Token"}
             thumbClass="h-full w-full object-cover rounded-md"
           />
@@ -498,7 +493,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       </div>
       
       {/* Metrics row */}
-      <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <div className="min-w-0">
           <span className="text-white/60">MC:</span>
           <span className={`ml-1 font-mono truncate font-semibold ${
@@ -511,12 +506,6 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
                   : 'text-white')
           }`}>
             {token.is_on_curve ? '— (on curve)' : (token.marketcap && token.marketcap !== 'null' && token.marketcap !== '0' ? `$${formatMarketcap(parseFloat(token.marketcap))}` : '—')}
-          </span>
-        </div>
-        <div className="min-w-0">
-          <span className="text-white/60">Price:</span>
-          <span className="text-white ml-1 font-mono truncate">
-            {token.is_on_curve ? '— (on curve)' : (token.price_usd && token.price_usd !== 'null' && token.price_usd !== '0' ? `$${parseFloat(token.price_usd).toFixed(8)}` : '—')}
           </span>
         </div>
         <div className="min-w-0">
@@ -538,7 +527,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       
       {/* Badges row */}
       <div className="mt-3 flex items-center gap-2">
-        <SocialBadges links={token.links} />
+        <SocialBadges links={token.links} mint={token.mint} />
         <span className="text-xs text-white/30 font-mono ml-auto">
           {token.mint.slice(0, 4)}...{token.mint.slice(-4)}
         </span>
@@ -708,7 +697,6 @@ export const Scope = ({
   const [isSearchFiltered, setIsSearchFiltered] = useState(false);
   
   // Chat state
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<Array<{ type: 'user' | 'assistant'; content: string; timestamp: Date }>>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -739,9 +727,6 @@ export const Scope = ({
   const [hoveredAgent, setHoveredAgent] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   
-  // Chat resize state
-  const [chatWidth, setChatWidth] = useState(450);
-  const [isResizing, setIsResizing] = useState(false);
 
   // Load conversations from localStorage on component mount
   useEffect(() => {
@@ -814,50 +799,11 @@ export const Scope = ({
   // Auto-close chat when Scope closes
   useEffect(() => {
     if (!isOpen) {
-      setIsChatOpen(false);
       setMessages([]);
       setInputMessage('');
-      setChatWidth(450); // Reset width when closing
     }
   }, [isOpen]);
   
-  // Chat resize handlers
-  const handleResizeStart = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsResizing(true);
-  };
-  
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    if (!isResizing) return;
-    
-    const newWidth = window.innerWidth - e.clientX;
-    const minWidth = 300;
-    const maxWidth = 800;
-    
-    if (newWidth >= minWidth && newWidth <= maxWidth) {
-      // Use requestAnimationFrame for smooth updates
-      requestAnimationFrame(() => {
-        setChatWidth(newWidth);
-      });
-    }
-  }, [isResizing]);
-  
-  const handleResizeEnd = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-  
-  // Add resize event listeners
-  useEffect(() => {
-    if (isResizing) {
-      document.addEventListener('mousemove', handleResizeMove);
-      document.addEventListener('mouseup', handleResizeEnd);
-      
-      return () => {
-        document.removeEventListener('mousemove', handleResizeMove);
-        document.removeEventListener('mouseup', handleResizeEnd);
-      };
-    }
-  }, [isResizing, handleResizeMove, handleResizeEnd]);
 
 
 
@@ -895,7 +841,7 @@ export const Scope = ({
       tokensLength: tokens?.length || 0,
       isLoading,
       connectionStatus,
-      lastUpdate: lastUpdate?.toLocaleTimeString()
+      lastUpdate: lastUpdate?.toLocaleTimeString() || null
     });
     
 
@@ -924,8 +870,8 @@ export const Scope = ({
     })));
     
     // Use transformed property names from useServerData and limit to 30 tokens each
-    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve).slice(0, 30);
-    const filled = tokensToFilter.filter(t => t && t.status === 'active').slice(0, 30);
+    const newPairs = tokensToFilter.filter(t => t && t.status === 'active').slice(0, 30); // Show active tokens with metadata
+    const filled = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve).slice(0, 30); // Show fresh tokens
     // EDGE: Fresh tokens sorted by marketcap (highest to lowest, up to 84K)
     const onEdge = tokensToFilter
       .filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.marketcap && t.marketcap !== 'null' && t.marketcap !== '0')
@@ -1094,7 +1040,6 @@ export const Scope = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         // Clean up state immediately when closing
-        setIsChatOpen(false);
         setMessages([]);
         setInputMessage('');
         // Call the parent's onClose function
@@ -1177,27 +1122,8 @@ export const Scope = ({
             </motion.div>
           </div>
         
-          {/* Right side - Robot Button, Star Button, Close Button */}
+          {/* Right side - Star Button, Close Button */}
           <div className="flex justify-end items-center space-x-3">
-            {/* Robot Button */}
-            <motion.button
-              onClick={() => setIsChatOpen(!isChatOpen)}
-              className={`p-2 rounded-full transition-all duration-300 ${
-                isChatOpen 
-                  ? 'bg-gradient-to-r from-gray-800 to-black shadow-lg shadow-black/50 border border-gray-600' 
-                  : 'bg-black/20 hover:bg-black/40 border border-gray-700 shadow-md shadow-black/30'
-              }`}
-              initial={{ x: 20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 6.5V7.5C15 8.3 14.3 9 13.5 9H10.5C9.7 9 9 8.3 9 7.5V6.5L3 7V9L9 8.5V9.5C9 10.3 9.7 11 10.5 11H13.5C14.3 11 15 10.3 15 9.5V8.5L21 9ZM7.5 12C6.7 12 6 12.7 6 13.5V16.5C6 17.3 6.7 18 7.5 18S9 17.3 9 16.5V13.5C9 12.7 8.3 12 7.5 12ZM16.5 12C15.7 12 15 12.7 15 13.5V16.5C15 17.3 15.7 18 16.5 18S18 17.3 18 16.5V13.5C18 12.7 17.3 12 16.5 12ZM12 13.5C11.2 13.5 10.5 14.2 10.5 15V17C10.5 17.8 11.2 18.5 12 18.5S13.5 17.8 13.5 17V15C13.5 14.2 12.8 13.5 12 13.5Z"/>
-              </svg>
-            </motion.button>
-
             {/* Star Button */}
             <HeaderStarButton tokens={tokens} />
 
@@ -1205,7 +1131,6 @@ export const Scope = ({
             <motion.button
               onClick={() => {
                 // Clean up state immediately when closing
-                setIsChatOpen(false);
                 setMessages([]);
                 setInputMessage('');
                 // Call the parent's onClose function
@@ -1250,18 +1175,10 @@ export const Scope = ({
           </div>
         ) : (
           <div className="flex gap-6">
-            {/* Token Columns - will shrink/expand based on chat state with smooth animation */}
-            <div 
-              className="flex gap-6"
-              style={{
-                width: isChatOpen ? `calc(100% - ${chatWidth}px)` : '100%',
-                transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-              }}
-            >
-              <TokenColumn 
-                title="FRESH MINTS" 
-                items={filteredTokens.newPairs} 
-                className="border-r border-gray-700 flex-1"
+            <TokenColumn 
+              title="FRESH MINTS" 
+              items={filteredTokens.newPairs} 
+              className="border-r border-gray-700 flex-1 min-w-0"
                 visibleMintsRef={visibleMintsRef}
                 agents={agents}
                 newTokenMint={newTokenMint}
@@ -1271,10 +1188,7 @@ export const Scope = ({
                   // Handle companion attachment
                   handleCompanionAttached(companionName, token);
                   
-                  // Auto-open chat and simulate companion analysis
-                  if (!isChatOpen) {
-                    setIsChatOpen(true);
-                  }
+                  // Simulate companion analysis
                   
                   // Create new conversation for token analysis
                   const newConversation = {
@@ -1324,7 +1238,7 @@ export const Scope = ({
               <TokenColumn 
                 title="ON EDGE" 
                 items={filteredTokens.onEdge} 
-                className="border-r border-gray-700 flex-1"
+                className="border-r border-gray-700 flex-1 min-w-0"
                 visibleMintsRef={visibleMintsRef}
                 agents={agents}
                 newTokenMint={newTokenMint}
@@ -1334,10 +1248,7 @@ export const Scope = ({
                   // Handle companion attachment
                   handleCompanionAttached(companionName, token);
                   
-                  // Auto-open chat and simulate companion analysis
-                  if (!isChatOpen) {
-                    setIsChatOpen(true);
-                  }
+                  // Simulate companion analysis
                   
                   // Create new conversation for token analysis
                   const newConversation = {
@@ -1385,99 +1296,12 @@ export const Scope = ({
                   }, 500);
                 }}
               />
-              <TokenColumn 
-                title="FILLED" 
-                items={filteredTokens.filled} 
-                className="flex-1"
-                visibleMintsRef={visibleMintsRef}
-                agents={agents}
-                newTokenMint={newTokenMint}
-                attachedCompanions={attachedCompanions}
-                onCompanionDetach={handleCompanionDetach}
-                onCompanionAttached={(companionName, token) => {
-                  // Handle companion attachment
-                  handleCompanionAttached(companionName, token);
-                  
-                  // Auto-open chat and simulate companion analysis
-                  if (!isChatOpen) {
-                    setIsChatOpen(true);
-                  }
-                  
-                  // Create new conversation for token analysis
-                  const newConversation = {
-                    id: Date.now().toString(),
-                    title: `${companionName} analyzing ${token.name || token.symbol || 'token'}`,
-                    messages: [],
-                    timestamp: new Date()
-                  };
-                  setConversationHistory(prev => [newConversation, ...prev.slice(0, 19)]);
-                  setCurrentConversationId(newConversation.id);
-                  
-                  // Simulate companion analyzing the token
-                  setTimeout(() => {
-                    setTypingCompanion(companionName);
-                    setIsTyping(true);
-                    
-                    // Simulate analysis time
-                    const analysisTime = 3000 + Math.random() * 2000;
-                    
-                    setTimeout(() => {
-                      setIsTyping(false);
-                      setTypingCompanion(null);
-                      
-                      // Add analysis message
-                      const analysisMessage = {
-                        type: 'assistant' as const,
-                        content: `${companionName}: I've analyzed ${token.name || token.symbol || 'this token'}. Market cap: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'This is on a bonding curve - interesting dynamics ahead!' : 'Standard token with typical market behavior.'}`,
-                        timestamp: new Date()
-                      };
-                      setMessages(prev => [analysisMessage, ...prev]);
-                      
-                      // Update conversation history
-                      if (currentConversationId) {
-                        setConversationHistory(prev => {
-                          const updated = [...prev];
-                          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
-                          
-                          if (currentConvIndex !== -1) {
-                            updated[currentConvIndex].messages = [analysisMessage];
-                          }
-                          return updated;
-                        });
-                      }
-                    }, analysisTime);
-                  }, 500);
-                }}
-              />
-            </div>
-            
-            {/* Chat + Companions Panel - Absolute positioned for full height with smooth animation */}
-            <div 
-              className={`bg-black/80 border-l border-gray-700 absolute right-0 bottom-0 h-full z-40 flex-shrink-0 ${
-                isChatOpen ? 'overflow-hidden' : 'w-0 overflow-hidden'
-              }`}
-              style={{
-                width: isChatOpen ? `${chatWidth}px` : '0px',
-                transition: isResizing ? 'none' : 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-              }}
-            >
-              {/* Resize Handle - Left edge */}
-              {isChatOpen && (
-                <div
-                  className="absolute left-0 top-0 bottom-0 w-2 bg-gray-600 hover:bg-blue-500 cursor-col-resize transition-colors duration-200 z-10 group"
-                  onMouseDown={handleResizeStart}
-                  title="Drag to resize chat panel"
-                >
-                  {/* Visual indicator for resize handle */}
-                  <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-0.5 h-8 bg-white/30 group-hover:bg-white/50 transition-all duration-200" />
-                </div>
-              )}
-              <div className="h-full flex flex-col">
-                {/* Companions Section - Fixed height */}
-                <div className="p-4 border-b border-gray-700 flex-shrink-0" style={{ pointerEvents: 'auto' }}>
-                  <div className="flex items-center justify-center mb-4">
-                    <h2 className="text-xl font-bold text-white">Companions</h2>
-                  </div>
+              <div className="flex flex-col flex-1 min-w-0 relative">
+                <h2 className="text-white text-lg font-bold text-center flex-shrink-0">COMPANIONS</h2>
+                <div className="w-full border-b border-gray-700 mb-3 -mx-3" />
+                
+                {/* Scroll section */}
+                <div className="flex-1 overflow-y-auto">
                   <div className="flex justify-center">
                     <div className="flex gap-4">
                       {agents.map((agent, index) => (
@@ -1523,336 +1347,300 @@ export const Scope = ({
                       ))}
                     </div>
                   </div>
-                </div>
-                
-                {/* Messages Area - Expandable */}
-                <div className="flex-1 overflow-y-auto flex flex-col p-4 min-h-0 custom-scrollbar">
-                  {messages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
-                        Drag a companion onto a token, pick a companion, or start typing to begin…
-                      </div>
+                  
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
+                      Drag a companion onto a token, pick a companion, or start typing to begin…
                     </div>
-                  ) : (
-                    <>
-                      {messages.map((message, index) => (
-                        <div
-                          key={index}
-                          className={`flex mb-3 text-base leading-relaxed ${
-                            message.type === 'assistant' 
-                              ? 'justify-start' 
-                              : 'justify-end'
-                          }`}
-                        >
-                          <div className={`${
-                            message.type === 'assistant' 
-                              ? 'bg-gray-800 text-gray-200' 
-                              : 'bg-blue-600 text-white'
-                          } p-3 rounded-lg max-w-[75%]`}>
-                            {message.content}
-                          </div>
-                        </div>
-                      ))}
-                      
-                      {/* Scroll anchor for auto-scroll */}
-                      <div ref={messagesEndRef} />
-                      
-                      {/* Typing Indicator - Positioned at bottom */}
-                      <AnimatePresence>
-                        <TypingIndicator 
-                          isTyping={isTyping} 
-                          companionName={typingCompanion || undefined} 
-                        />
-                      </AnimatePresence>
-                    </>
-                  )}
+                  </div>
                 </div>
                 
-                {/* API Key Popup */}
-                {showApiKeyPopup && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100]"
-                    onClick={() => setShowApiKeyPopup(false)}
-                  >
-                    <motion.div
-                      className="bg-gray-900 border border-gray-600 rounded-lg p-6 w-96 max-w-[90vw]"
-                      onClick={(e) => e.stopPropagation()}
+                {/* Chat input row at bottom */}
+                <div className="shrink-0">
+                  <div className="w-full bg-black/70 border-t border-gray-700 p-2 flex items-center gap-2 h-16 chat-input-container">
+                    <input
+                      type="text"
+                      value={inputMessage}
+                      onChange={handleInputChange}
+                      onKeyPress={handleKeyPress}
+                      onFocus={(e) => e.preventDefault()}
+                      onBlur={(e) => e.preventDefault()}
+                      placeholder="Type your message..."
+                      className="flex-1 rounded-lg bg-gray-900 p-1.5 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 h-9 ml-1"
+                      style={{ scrollBehavior: 'auto' }}
+                    />
+                    <button
+                      onClick={() => {
+                        setIsSettingsOpen(!isSettingsOpen);
+                        if (!isSettingsOpen) {
+                          setSettingsView('menu');
+                        }
+                      }}
+                      className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3 py-1.5 h-9 transition-colors duration-200"
+                      title="Settings & History"
                     >
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-white text-lg font-semibold capitalize">
-                          Configure {editingApiKey} API
-                        </h3>
-                        <button
-                          onClick={() => setShowApiKeyPopup(false)}
-                          className="text-gray-400 hover:text-white transition-colors"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                      
-                      <div className="mb-4">
-                        <label className="text-gray-300 text-sm mb-2 block">API Key</label>
-                        <input
-                          type="password"
-                          value={apiKeys[editingApiKey as keyof typeof apiKeys]}
-                          onChange={(e) => setApiKeys(prev => ({ ...prev, [editingApiKey]: e.target.value }))}
-                          placeholder={`Enter your ${editingApiKey} API key`}
-                          className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                      
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setShowApiKeyPopup(false)}
-                          className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded px-4 py-2 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedAPI(editingApiKey);
-                            setShowApiKeyPopup(false);
-                          }}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 transition-colors"
-                        >
-                          Save & Select
-                        </button>
-                      </div>
-                    </motion.div>
-                  </motion.div>
-                )}
-                
-                {/* Settings Panel */}
-                {isSettingsOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    className="w-full bg-black/90 border-t border-gray-700 p-4 flex-shrink-0"
-                  >
-                    {/* Main Menu View */}
-                    {settingsView === 'menu' && (
-                      <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <h3 className="text-white text-lg font-semibold">Settings</h3>
-                          <button
-                            onClick={() => setIsSettingsOpen(false)}
-                            className="text-gray-400 hover:text-white transition-colors"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                        
-                        <div className="space-y-3">
-                          <button
-                            onClick={() => {
-                              setMessages([]);
-                              setInputMessage('');
-                              setCurrentConversationId(null);
-                              setIsSettingsOpen(false);
-                            }}
-                            className="w-full p-4 bg-blue-600/20 border border-blue-500/30 hover:border-blue-400/50 transition-colors text-left"
-                          >
-                            <div className="text-white text-lg font-medium">New Chat</div>
-                            <div className="text-blue-300 text-sm mt-1">Start a fresh conversation</div>
-                          </button>
-                          
-                          <button
-                            onClick={() => setSettingsView('api')}
-                            className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors text-left"
-                          >
-                            <div className="text-white text-lg font-medium">Companion API</div>
-                            <div className="text-gray-400 text-sm mt-1">Configure AI providers and API keys</div>
-                          </button>
-                          
-                          <button
-                            onClick={() => setSettingsView('history')}
-                            className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors text-left"
-                          >
-                            <div className="text-white text-lg font-medium">History</div>
-                            <div className="text-gray-400 text-sm mt-1">View and restore past conversations</div>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* API Configuration View */}
-                    {settingsView === 'api' && (
-                      <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => setSettingsView('menu')}
-                              className="text-gray-400 hover:text-white transition-colors"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                              </svg>
-                            </button>
-                            <h3 className="text-white text-lg font-semibold">Companion API</h3>
-                          </div>
-                          <button
-                            onClick={() => setIsSettingsOpen(false)}
-                            className="text-gray-400 hover:text-white transition-colors"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3">
-                          {[
-                            { key: 'grok4', name: 'Grok 4', default: true },
-                            { key: 'gemini', name: 'Gemini', default: false },
-                            { key: 'perplexity', name: 'Perplexity', default: false },
-                            { key: 'chatgpt', name: 'ChatGPT', default: false }
-                          ].map((api) => (
-                            <button
-                              key={api.key}
-                              onClick={() => {
-                                if (api.key === 'grok4') {
-                                  setSelectedAPI(api.key);
-                                } else {
-                                  setEditingApiKey(api.key);
-                                  setShowApiKeyPopup(true);
-                                }
-                              }}
-                              className={`p-3 rounded-lg border transition-all duration-200 ${
-                                selectedAPI === api.key
-                                  ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-                                  : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                              }`}
-                            >
-                              <div className="text-sm font-medium">{api.name}</div>
-                              {api.default && (
-                                <div className="text-xs text-gray-400 mt-1">Default</div>
-                              )}
-                              {!api.default && (
-                                <div className="text-xs text-gray-400 mt-1">Click to configure</div>
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* History View */}
-                    {settingsView === 'history' && (
-                      <div>
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => setSettingsView('menu')}
-                              className="text-gray-400 hover:text-white transition-colors"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                              </svg>
-                            </button>
-                            <h3 className="text-white text-lg font-semibold">Conversation History</h3>
-                          </div>
-                          <button
-                            onClick={() => setIsSettingsOpen(false)}
-                            className="text-gray-400 hover:text-white transition-colors"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                        
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {conversationHistory.length === 0 ? (
-                            <div className="text-gray-400 text-sm text-center py-8">
-                              No conversations yet
-                            </div>
-                          ) : (
-                            <>
-                              <div className="flex justify-between items-center mb-3">
-                                <span className="text-gray-400 text-xs">
-                                  {conversationHistory.length} conversations
-                                </span>
-                                                                  <button
-                                    onClick={() => {
-                                      if (confirm('Clear all conversation history?')) {
-                                        setConversationHistory([]);
-                                        localStorage.removeItem('scope_conversations');
-                                      }
-                                    }}
-                                    className="text-red-400 hover:text-red-300 text-xs transition-colors"
-                                  >
-                                    Clear All
-                                  </button>
-                              </div>
-                              {conversationHistory.map((conv) => (
-                                <button
-                                  key={conv.id}
-                                  onClick={() => {
-                                    setMessages(conv.messages);
-                                    setIsSettingsOpen(false);
-                                  }}
-                                  className="w-full text-left p-3 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors"
-                                >
-                                  <div className="text-white text-sm font-medium truncate">{conv.title}</div>
-                                  <div className="text-gray-400 text-xs mt-1">
-                                    {conv.timestamp.toLocaleDateString()} - {conv.messages.length} messages
-                                  </div>
-                                </button>
-                              ))}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                )}
-                
-                {/* Input Area - Fixed at bottom with fixed height */}
-                <div className="w-full bg-black/70 border-t border-gray-700 p-2 flex items-center gap-2 flex-shrink-0 h-16 chat-input-container">
-                  <input
-                    type="text"
-                    value={inputMessage}
-                    onChange={handleInputChange}
-                    onKeyPress={handleKeyPress}
-                    onFocus={(e) => e.preventDefault()}
-                    onBlur={(e) => e.preventDefault()}
-                    placeholder="Type your message..."
-                    className="flex-1 rounded-lg bg-gray-900 p-1.5 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 h-9 ml-1"
-                    style={{ scrollBehavior: 'auto' }}
-                  />
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={sendMessage}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 h-9"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
+              </div>
+          </div>
+        )}
+        
+        {/* API Key Popup */}
+        {showApiKeyPopup && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100]"
+            onClick={() => setShowApiKeyPopup(false)}
+          >
+            <motion.div
+              className="bg-gray-900 border border-gray-600 rounded-lg p-6 w-96 max-w-[90vw]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-white text-lg font-semibold capitalize">
+                  Configure {editingApiKey} API
+                </h3>
+                <button
+                  onClick={() => setShowApiKeyPopup(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="mb-4">
+                <label className="text-gray-300 text-sm mb-2 block">API Key</label>
+                <input
+                  type="password"
+                  value={apiKeys[editingApiKey as keyof typeof apiKeys]}
+                  onChange={(e) => setApiKeys(prev => ({ ...prev, [editingApiKey]: e.target.value }))}
+                  placeholder={`Enter your ${editingApiKey} API key`}
+                  className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowApiKeyPopup(false)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded px-4 py-2 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedAPI(editingApiKey);
+                    setShowApiKeyPopup(false);
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 transition-colors"
+                >
+                  Save & Select
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        
+        {/* Settings Panel */}
+        {isSettingsOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="absolute bottom-24 right-4 w-80 bg-black/90 border border-gray-700 rounded-lg p-4 z-[70] max-h-[calc(100vh-220px)] overflow-y-auto"
+          >
+            {/* Main Menu View */}
+            {settingsView === 'menu' && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-white text-lg font-semibold">Settings</h3>
                   <button
-                    onClick={() => {
-                      setIsSettingsOpen(!isSettingsOpen);
-                      if (!isSettingsOpen) {
-                        setSettingsView('menu');
-                      }
-                    }}
-                    className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3 py-1.5 h-9 transition-colors duration-200"
-                    title="Settings & History"
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
+                </div>
+                
+                <div className="space-y-3">
                   <button
-                    onClick={sendMessage}
-                    className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 h-9"
+                    onClick={() => {
+                      setMessages([]);
+                      setInputMessage('');
+                      setCurrentConversationId(null);
+                      setIsSettingsOpen(false);
+                    }}
+                    className="w-full p-4 bg-blue-600/20 border border-blue-500/30 hover:border-blue-400/50 transition-colors text-left"
                   >
-                    Send
+                    <div className="text-white text-lg font-medium">New Chat</div>
+                    <div className="text-blue-300 text-sm mt-1">Start a fresh conversation</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => setSettingsView('api')}
+                    className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors text-left"
+                  >
+                    <div className="text-white text-lg font-medium">Companion API</div>
+                    <div className="text-gray-400 text-sm mt-1">Configure AI providers and API keys</div>
+                  </button>
+                  
+                  <button
+                    onClick={() => setSettingsView('history')}
+                    className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors text-left"
+                  >
+                    <div className="text-white text-lg font-medium">History</div>
+                    <div className="text-gray-400 text-sm mt-1">View and restore past conversations</div>
                   </button>
                 </div>
               </div>
-            </div>
-          </div>
+            )}
+            
+            {/* API Configuration View */}
+            {settingsView === 'api' && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setSettingsView('menu')}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <h3 className="text-white text-lg font-semibold">Companion API</h3>
+                  </div>
+                  <button
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { key: 'grok4', name: 'Grok 4', default: true },
+                    { key: 'gemini', name: 'Gemini', default: false },
+                    { key: 'perplexity', name: 'Perplexity', default: false },
+                    { key: 'chatgpt', name: 'ChatGPT', default: false }
+                  ].map((api) => (
+                    <button
+                      key={api.key}
+                      onClick={() => {
+                        if (api.key === 'grok4') {
+                          setSelectedAPI(api.key);
+                        } else {
+                          setEditingApiKey(api.key);
+                          setShowApiKeyPopup(true);
+                        }
+                      }}
+                      className={`p-3 rounded-lg border transition-all duration-200 ${
+                        selectedAPI === api.key
+                          ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+                          : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
+                      }`}
+                    >
+                      <div className="text-sm font-medium">{api.name}</div>
+                      {api.default && (
+                        <div className="text-xs text-gray-400 mt-1">Default</div>
+                      )}
+                      {!api.default && (
+                        <div className="text-xs text-gray-400 mt-1">Click to configure</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* History View */}
+            {settingsView === 'history' && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setSettingsView('menu')}
+                      className="text-gray-400 hover:text-white transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <h3 className="text-white text-lg font-semibold">Conversation History</h3>
+                  </div>
+                  <button
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {conversationHistory.length === 0 ? (
+                    <div className="text-gray-400 text-sm text-center py-8">
+                      No conversations yet
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center mb-3">
+                        <span className="text-gray-400 text-xs">
+                          {conversationHistory.length} conversations
+                        </span>
+                        <button
+                          onClick={() => {
+                            if (confirm('Clear all conversation history?')) {
+                              setConversationHistory([]);
+                              localStorage.removeItem('scope_conversations');
+                            }
+                          }}
+                          className="text-red-400 hover:text-red-300 text-xs transition-colors"
+                        >
+                          Clear All
+                        </button>
+                      </div>
+                      {conversationHistory.map((conv) => (
+                        <button
+                          key={conv.id}
+                          onClick={() => {
+                            setMessages(conv.messages);
+                            setIsSettingsOpen(false);
+                          }}
+                          className="w-full text-left p-3 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors"
+                        >
+                          <div className="text-white text-sm font-medium truncate">{conv.title}</div>
+                          <div className="text-gray-400 text-xs mt-1">
+                            {conv.timestamp.toLocaleDateString()} - {conv.messages.length} messages
+                          </div>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </motion.div>
         )}
       </motion.div>
 
@@ -1868,7 +1656,13 @@ const ScopeWithWatchlist: React.FC<{
   onClose: () => void;
   tokens: any[];
   isLoading: boolean;
-  lastUpdate: string | null;
+  lastUpdate: Date | null;
+  stats: any;
+  connectionStatus: string;
+  live: boolean;
+  resumeLive: () => void;
+  pauseLive: () => void;
+  newTokenMint: string | null;
 }> = (props) => {
   return (
     <WatchlistProvider>
@@ -1878,4 +1672,3 @@ const ScopeWithWatchlist: React.FC<{
 };
 
 export default ScopeWithWatchlist;
-
