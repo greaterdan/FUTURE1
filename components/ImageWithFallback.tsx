@@ -4,7 +4,7 @@ export default function ImageWithFallback({
   src, 
   alt, 
   className = "w-10 h-10 rounded-lg",
-  fallbackClassName = "w-10 h-10 rounded-lg bg-neutral-800 grid place-items-center text-xs text-neutral-400 overflow-hidden"
+  fallbackClassName = "w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 grid place-items-center text-xs text-white font-bold overflow-hidden"
 }: { 
   src?: string; 
   alt: string;
@@ -14,9 +14,11 @@ export default function ImageWithFallback({
   const [broken, setBroken] = useState(false);
   
   if (!src || broken) {
+    // Generate a more attractive fallback with gradient background
+    const initials = alt.slice(0, 2).toUpperCase();
     return (
       <div className={fallbackClassName}>
-        {alt.slice(0, 2).toUpperCase()}
+        {initials}
       </div>
     );
   }

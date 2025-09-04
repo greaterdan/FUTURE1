@@ -34,6 +34,17 @@ const metadataEnricher = new MetadataEnricherService(connection, tokenRepository
 const tokenStatusUpdater = new TokenStatusUpdaterService();
 const holderIndexer = new HolderIndexer(connection, tokenRepository);
 
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (error) => {
+    logger.error('Uncaught Exception:', error);
+    // Don't exit, just log the error
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    // Don't exit, just log the error
+});
+
 // Graceful shutdown function
 const gracefulShutdown = async (signal: string) => {
     logger.info(`Received ${signal}. Starting graceful shutdown...`);

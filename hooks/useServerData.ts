@@ -124,7 +124,7 @@ export const useServerData = (isOpen: boolean) => {
   const fetchTokens = useCallback(async () => {
     try {
       setConnectionStatus("Fetching tokens...");
-      const response = await fetch(`${SERVER_BASE_URL}/api/tokens?limit=100`);
+      const response = await fetch(`${SERVER_BASE_URL}/api/tokens/fresh?limit=100`);
       
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status}`);
@@ -253,13 +253,13 @@ export const useServerData = (isOpen: boolean) => {
             console.log('⚠️ DUPLICATE TOKEN PREVENTED:', newToken.mint);
             return prev;
           }
+          console.log('🔥 NEW TOKEN RECEIVED VIA WEBSOCKET:', newToken.name || newToken.symbol || newToken.mint);
           const combined = [newToken, ...prev];
           // Limit to 200 tokens to prevent memory issues
           return combined.slice(0, 200);
         });
         setLastUpdate(new Date());
         setNewTokenMint(newToken.mint);
-        console.log('🔥 NEW TOKEN ADDED:', newToken.name || newToken.symbol || newToken.mint);
         
         // Clear the flag after animation
         setTimeout(() => setNewTokenMint(null), 1000);
@@ -270,7 +270,7 @@ export const useServerData = (isOpen: boolean) => {
           token.mint === updatedToken.mint ? updatedToken : token
         ));
         setLastUpdate(new Date());
-        console.log('🔄 TOKEN UPDATED:', updatedToken.name || updatedToken.symbol || updatedToken.mint);
+        console.log('🔄 TOKEN UPDATED VIA WEBSOCKET:', updatedToken.name || updatedToken.symbol || updatedToken.mint);
       }
     }
   }, [lastMessage]);
@@ -284,7 +284,7 @@ export const useServerData = (isOpen: boolean) => {
       if (live) {
         const interval = setInterval(() => {
           fetchTokens();
-        }, 30000); // Refresh every 30 seconds for fallback
+        }, 10000); // Refresh every 10 seconds for fallback
         
         return () => clearInterval(interval);
       }

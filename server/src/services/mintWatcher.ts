@@ -21,7 +21,13 @@ export class MintWatcherService {
     private subscriptionId: number | null = null;
 
     constructor(rpcUrl: string) {
-        this.connection = new Connection(rpcUrl, 'confirmed');
+        // Use multiple RPC endpoints for better reliability
+        const rpcUrls = [
+            rpcUrl,
+            'https://api.mainnet-beta.solana.com',
+            'https://solana-api.projectserum.com'
+        ];
+        this.connection = new Connection(rpcUrls[0], 'confirmed');
     }
 
     async start(): Promise<void> {
@@ -37,15 +43,22 @@ export class MintWatcherService {
             this.subscriptionId = this.connection.onLogs(
                 TOKEN_PROGRAM_ID,
                 async (logs) => {
-                    if (logs.err) return;
-                    
-                    // Check if this is an InitializeMint instruction
-                    const hasInitializeMint = logs.logs.some(
-                        (log) => log.includes("Instruction: InitializeMint") || log.includes("Instruction: InitializeMint2")
-                    );
-                    
-                    if (hasInitializeMint) {
-                        await this.processInitializeMint(logs.signature);
+                    try {
+                        if (logs.err) return;
+                        
+                        // Check if this is an InitializeMint instruction
+                        const hasInitializeMint = logs.logs.some(
+                            (log) => log.includes("Instruction: InitializeMint") || log.includes("Instruction: InitializeMint2")
+                        );
+                        
+                        if (hasInitializeMint) {
+                            // Process with a small delay to avoid overwhelming the RPC
+                            setTimeout(async () => {
+                                await this.processInitializeMint(logs.signature);
+                            }, Math.random() * 500); // Random delay 0-500ms
+                        }
+                    } catch (error) {
+                        logger.error('Error processing logs:', error);
                     }
                 },
                 'confirmed'
@@ -85,11 +98,29 @@ export class MintWatcherService {
         try {
             logger.info(`Processing InitializeMint transaction: ${signature}`);
             
-            // Get transaction details
-            const tx = await this.connection.getParsedTransaction(signature, {
-                maxSupportedTransactionVersion: 0,
-                commitment: 'confirmed'
-            });
+            // Add delay to avoid rate limiting
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // Get transaction details with retry logic
+            let tx;
+            let retries = 3;
+            while (retries > 0) {
+                try {
+                    tx = await this.connection.getParsedTransaction(signature, {
+                        maxSupportedTransactionVersion: 0,
+                        commitment: 'confirmed'
+                    });
+                    break;
+                } catch (error: any) {
+                    if (error.message?.includes('429') || error.message?.includes('rate limited')) {
+                        logger.warn(`Rate limited, retrying in 2 seconds... (${retries} retries left)`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        retries--;
+                    } else {
+                        throw error;
+                    }
+                }
+            }
             
             if (!tx?.meta) {
                 logger.warn(`No transaction metadata for ${signature}`);
@@ -124,7 +155,10 @@ export class MintWatcherService {
             if (newToken) {
                 const ws = getWsService();
                 if (ws) {
+                    logger.info(`🔥 Broadcasting new token: ${newToken.mint}`);
                     ws.broadcastNewToken(newToken);
+                } else {
+                    logger.warn('WebSocket service not available for broadcasting new token');
                 }
             }
             

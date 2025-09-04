@@ -43,15 +43,22 @@ export class WebSocketService {
             data: token
         });
 
+        let successCount = 0;
         this.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
-                client.send(message);
+                try {
+                    client.send(message);
+                    successCount++;
+                } catch (error) {
+                    logger.error('Error sending WebSocket message:', error);
+                    this.clients.delete(client);
+                }
             } else {
                 this.clients.delete(client);
             }
         });
 
-        logger.debug(`Broadcasted new token to ${this.clients.size} clients: ${token.mint}`);
+        logger.info(`🔥 Broadcasted new token to ${successCount}/${this.clients.size} clients: ${token.mint}`);
     }
 
     // Broadcast token update to all connected clients
@@ -61,15 +68,22 @@ export class WebSocketService {
             data: token
         });
 
+        let successCount = 0;
         this.clients.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
-                client.send(message);
+                try {
+                    client.send(message);
+                    successCount++;
+                } catch (error) {
+                    logger.error('Error sending WebSocket message:', error);
+                    this.clients.delete(client);
+                }
             } else {
                 this.clients.delete(client);
             }
         });
 
-        logger.debug(`Broadcasted token update to ${this.clients.size} clients: ${token.mint}`);
+        logger.debug(`Broadcasted token update to ${successCount}/${this.clients.size} clients: ${token.mint}`);
     }
 
     public getConnectedClients(): number {

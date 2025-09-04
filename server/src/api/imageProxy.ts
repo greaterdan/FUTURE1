@@ -1,55 +1,65 @@
 import type { Request, Response } from "express";
+import { Readable } from "node:stream";
 
 export async function imageProxy(req: Request, res: Response): Promise<void> {
-  const u = req.query.u as string;
+  const u = String(req.query.u || "");
   if (!u) {
-    res.status(400).end();
+    res.status(400).send("missing url");
     return;
   }
-  
+
+  // allow data URLs too
+  if (u.startsWith("data:image/")) {
+    const m = u.match(/^data:(image\/[^;]+);base64,(.*)$/i);
+    if (!m) {
+      res.status(400).send("bad data url");
+      return;
+    }
+    res.setHeader("Content-Type", m[1]);
+    res.setHeader("Cache-Control", "public, max-age=300");
+    res.end(Buffer.from(m[2], "base64"));
+    return;
+  }
+
+  // basic allowlist
+  if (!/^https?:\/\//i.test(u)) {
+    res.status(400).send("bad url");
+    return;
+  }
+
+  const controller = new AbortController();
+  const to = setTimeout(() => controller.abort(), 15000);
+
   try {
-    const r = await fetch(u, { 
-      headers: { 
-        "User-Agent": "Solana-Token-Tracker/1.0" 
-      } 
+    const r = await fetch(u, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "Solana-Token-Tracker/1.0",
+        "Accept": "image/*,application/octet-stream;q=0.9,*/*;q=0.8"
+      }
     });
-    
     if (!r.ok) {
       res.status(502).end();
       return;
     }
-    
+
     const ct = r.headers.get("content-type") || "image/*";
-    
-    // Set CORS headers to allow cross-origin access
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
-    
     res.setHeader("Content-Type", ct);
-    res.setHeader("Cache-Control", "public, max-age=300");
-    
-    // Convert ReadableStream to Node.js stream
+    res.setHeader("Cache-Control", "public, max-age=300, s-maxage=300");
+
     if (r.body) {
-      const reader = r.body.getReader();
-      const pump = async () => {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            res.write(value);
-          }
-          res.end();
-        } catch (error) {
-          res.status(502).end();
-        }
-      };
-      pump();
+      // convert WHATWG stream → Node stream
+      const nodeStream = (Readable as any).fromWeb
+        ? (Readable as any).fromWeb(r.body as any)
+        : r.body as any;
+      nodeStream.pipe(res);
     } else {
-      res.end();
+      const buf = Buffer.from(await r.arrayBuffer());
+      res.end(buf);
     }
-  } catch {
+  } catch (_e) {
     res.status(502).end();
+  } finally {
+    clearTimeout(to);
   }
 }

@@ -60,10 +60,11 @@ export class TokenStatusUpdaterService {
         try {
             const now = new Date();
 
-            // Get all fresh tokens
-            const freshTokens = await tokenRepository.getTokensByStatus('fresh');
+            // Get all fresh tokens with their latest market cap data
+            const freshTokens = await tokenRepository.getAllTokens();
+            const freshTokensOnly = freshTokens.filter(token => token.status === 'fresh');
             
-            for (const token of freshTokens) {
+            for (const token of freshTokensOnly) {
                 const tokenAge = now.getTime() - new Date(token.created_at).getTime();
                 const ageInMinutes = tokenAge / (1000 * 60);
 
@@ -73,14 +74,14 @@ export class TokenStatusUpdaterService {
                 // Move tokens based on age and activity
                 if (ageInMinutes > 30) {
                     // Tokens older than 30 minutes become 'active' if they have liquidity
-                    if (token.liquidity && token.liquidity > 0) {
+                    if (token.latest_marketcap?.liquidity && token.latest_marketcap.liquidity > 0) {
                         newStatus = 'active';
                         shouldUpdate = true;
                     }
                 } else if (ageInMinutes > 5) {
                     // Tokens older than 5 minutes but less than 30 minutes
                     // Check if they have liquidity to move to 'active'
-                    if (token.liquidity && token.liquidity > 1000) { // Minimum liquidity threshold
+                    if (token.latest_marketcap?.liquidity && token.latest_marketcap.liquidity > 1000) { // Minimum liquidity threshold
                         newStatus = 'active';
                         shouldUpdate = true;
                     }

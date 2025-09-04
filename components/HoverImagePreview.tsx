@@ -9,6 +9,7 @@ export default function HoverImagePreview({
 }: { src: string; alt?: string; thumbClass?: string }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
+  const [imageError, setImageError] = useState(false);
 
   // close on ESC / scroll
   useEffect(() => {
@@ -43,27 +44,41 @@ export default function HoverImagePreview({
       onMouseLeave={() => setOpen(false)}
       onClick={() => setOpen(false)}
     >
-      <img
-        src={src}
-        alt={alt}
-        className="w-[240px] h-[240px] object-cover rounded-lg"
-        draggable={false}
-      />
+      {imageError ? (
+        <div className="w-[240px] h-[240px] bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-lg font-bold">
+          {alt.slice(0, 2).toUpperCase()}
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          className="w-[240px] h-[240px] object-cover rounded-lg"
+          draggable={false}
+          onError={() => setImageError(true)}
+        />
+      )}
     </div>,
     document.body
   );
 
   return (
     <>
-      <img
-        src={src}
-        alt={alt}
-        className={thumbClass}
-        onMouseEnter={(e) => { setOpen(true); updatePos(e.clientX, e.clientY); }}
-        onMouseMove={(e) => updatePos(e.clientX, e.clientY)}
-        onMouseLeave={() => setOpen(false)}
-        onClick={(e) => { setOpen(true); updatePos(e.clientX, e.clientY); }}
-      />
+      {imageError ? (
+        <div className={`${thumbClass} bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold`}>
+          {alt.slice(0, 2).toUpperCase()}
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt={alt}
+          className={thumbClass}
+          onMouseEnter={(e) => { setOpen(true); updatePos(e.clientX, e.clientY); }}
+          onMouseMove={(e) => updatePos(e.clientX, e.clientY)}
+          onMouseLeave={() => setOpen(false)}
+          onClick={(e) => { setOpen(true); updatePos(e.clientX, e.clientY); }}
+          onError={() => setImageError(true)}
+        />
+      )}
       {preview}
     </>
   );

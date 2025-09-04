@@ -56,7 +56,7 @@ export class HolderIndexer {
   }
 
   private async snapshotHolders(mintStr: string) {
-    const mint = new PublicKey(mintStr);
+    // const mint = new PublicKey(mintStr); // Unused for now
 
     // query both programs
     const [a, b] = await Promise.all([

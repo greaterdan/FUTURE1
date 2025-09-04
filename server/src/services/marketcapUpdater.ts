@@ -162,7 +162,7 @@ export class MarketcapUpdaterService {
                 
                 // Update token status if it has valid liquidity and price
                 if (marketData.liquidity > 1000 && marketData.price_usd > 0) {
-                    await tokenRepository.updateTokenStatus(tokenId, 'active');
+                    await tokenRepository.updateTokenStatus(contractAddress, 'active');
                     logger.info(`Token ${contractAddress} marked as active (liquidity: $${marketData.liquidity.toLocaleString()})`);
                 }
                 
