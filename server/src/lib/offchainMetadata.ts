@@ -43,7 +43,7 @@ export async function resolveImageUrl(uri?: string): Promise<string | undefined>
       const ct = res.headers.get("content-type") || "";
       if (ct.startsWith("image/")) return url0;
       if (ct.includes("application/json") || ct.includes("text/plain")) {
-        const json = await res.json().catch(() => null);
+        const json = await res.json().catch(() => null) as any;
         const img =
           json?.image ||
           json?.image_url ||
@@ -66,7 +66,7 @@ export async function resolveImageUrl(uri?: string): Promise<string | undefined>
       try {
         const res = await fetchWithTimeout(url);
         if (!res.ok) continue;
-        const json = await res.json().catch(() => null);
+        const json = await res.json().catch(() => null) as any;
         const img =
           json?.image ||
           json?.image_url ||
@@ -79,3 +79,6 @@ export async function resolveImageUrl(uri?: string): Promise<string | undefined>
 
   return undefined;
 }
+
+
+

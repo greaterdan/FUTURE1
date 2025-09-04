@@ -10,13 +10,13 @@ export interface ServerTokenData {
   id: number;
   name?: string;
   symbol?: string;
-  contract_address: string;
+  mint: string; // Fixed: backend returns 'mint' not 'contract_address'
   creator?: string;
   source: string;
   launch_time?: string;
   decimals: number;
   supply: number;
-  blocktime: number;
+  blocktime: string; // Fixed: backend returns string, not number
   status: 'fresh' | 'active' | 'curve';
   metadata_uri?: string;
   image_url?: string;
@@ -25,15 +25,11 @@ export interface ServerTokenData {
   created_at: string;
   updated_at: string;
   display_name?: string;
-  latest_marketcap?: {
-    id: number;
-    token_id: number;
-    price_usd: number;
-    marketcap: number;
-    volume_24h: number;
-    liquidity: number;
-    timestamp: string;
-  };
+  // Fixed: backend returns these properties directly on the token, not nested
+  price_usd?: number;
+  marketcap?: number;
+  volume_24h?: number;
+  liquidity?: number;
 }
 
 // Transformed token data for the frontend components
@@ -80,25 +76,25 @@ interface Stats {
 // Transform server data to frontend format
 const transformTokenData = (serverToken: ServerTokenData): TransformedTokenData => {
   return {
-    mint: serverToken.contract_address,
+    mint: serverToken.mint, // Fixed: use 'mint' property
     name: serverToken.name,
     symbol: serverToken.symbol,
     decimals: serverToken.decimals,
     supply: serverToken.supply,
-    blocktime: serverToken.blocktime,
+    blocktime: new Date(serverToken.blocktime).getTime(), // Convert string to timestamp
     status: serverToken.status,
     imageUrl: serverToken.image_url,
     metadataUri: serverToken.metadata_uri,
     isOnCurve: serverToken.is_on_curve,
     bondingCurveAddress: serverToken.bonding_curve_address,
-    marketCap: serverToken.latest_marketcap?.marketcap,
-    price: serverToken.latest_marketcap?.price_usd,
-    volume24h: serverToken.latest_marketcap?.volume_24h,
-    liquidity: serverToken.latest_marketcap?.liquidity,
+    marketCap: serverToken.marketcap, // Fixed: use direct property
+    price: serverToken.price_usd, // Fixed: use direct property
+    volume24h: serverToken.volume_24h, // Fixed: use direct property
+    liquidity: serverToken.liquidity, // Fixed: use direct property
     links: {
-      dexscreener: `https://dexscreener.com/solana/${serverToken.contract_address}`,
-      jupiter: `https://jup.ag/swap/SOL-${serverToken.contract_address}`,
-      explorer: `https://solscan.io/token/${serverToken.contract_address}`,
+      dexscreener: `https://dexscreener.com/solana/${serverToken.mint}`,
+      jupiter: `https://jup.ag/swap/SOL-${serverToken.mint}`,
+      explorer: `https://solscan.io/token/${serverToken.mint}`,
     },
     createdAt: new Date(serverToken.created_at)
   };

@@ -188,7 +188,7 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
       <div className="fixed inset-0 z-[30] pointer-events-none radial-video-buttons">
         <div 
           className={`absolute top-1/2 -translate-y-1/2 pointer-events-auto transition-all duration-500 ease-out rotating-container ${
-            isOracleHubOpen ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
+            isOracleHubOpen || isScopeOpen ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
           }`}
           style={{
             left: '75%',

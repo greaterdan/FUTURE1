@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import CreationTimeDisplay from './CreationTimeDisplay';
 
 type TokenData = {
   address: string;
@@ -80,6 +81,9 @@ function TokenColumn({ title, tokens }: { title: string; tokens: TokenData[] }) 
             </div>
             <div className="mt-1 text-xs">
               Vol 24h: ${t.volume24h.toLocaleString()} | Buyers: {t.buyers} | Sellers: {t.sellers}
+            </div>
+            <div className="mt-2">
+              <CreationTimeDisplay createdAt={t.createdAt} />
             </div>
           </div>
         ))}

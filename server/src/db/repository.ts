@@ -78,6 +78,39 @@ export class TokenRepository {
         return result.rows[0] || null;
     }
 
+    async searchTokens(query: string, limit: number = 50): Promise<TokenWithMarketCap[]> {
+        const searchQuery = `
+            SELECT t.*, 
+                COALESCE(t.name, t.symbol, SUBSTRING(t.mint,1,4) || '…' || SUBSTRING(t.mint FROM LENGTH(t.mint)-3)) AS display_name,
+                m.price_usd, m.marketcap, m.volume_24h, m.liquidity
+            FROM tokens t
+            LEFT JOIN LATERAL (
+                SELECT * FROM marketcaps 
+                WHERE token_id = t.id 
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            ) m ON true
+            WHERE (
+                LOWER(t.name) ILIKE $1 
+                OR LOWER(t.symbol) ILIKE $1 
+                OR LOWER(t.mint) ILIKE $1
+            )
+            ORDER BY 
+                CASE 
+                    WHEN LOWER(t.name) ILIKE $1 THEN 1
+                    WHEN LOWER(t.symbol) ILIKE $1 THEN 2
+                    WHEN LOWER(t.mint) ILIKE $1 THEN 3
+                    ELSE 4
+                END,
+                COALESCE(t.blocktime, t.created_at) DESC
+            LIMIT $2
+        `;
+        
+        const searchTerm = `%${query.toLowerCase()}%`;
+        const result = await db.query(searchQuery, [searchTerm, limit]);
+        return result.rows;
+    }
+
     async findFreshTokens(limit: number = 100, offset: number = 0): Promise<TokenWithMarketCap[]> {
         const query = `
             SELECT t.*, 

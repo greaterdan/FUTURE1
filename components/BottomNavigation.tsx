@@ -4,9 +4,10 @@ import React, { useEffect, useState, useRef } from "react";
 interface BottomNavigationProps {
   isNavigationHubOpen?: boolean;
   isOracleHubOpen?: boolean;
+  isScopeOpen?: boolean;
 }
 
-export default function BottomNavigation({ isNavigationHubOpen = false, isOracleHubOpen = false }: BottomNavigationProps) {
+export default function BottomNavigation({ isNavigationHubOpen = false, isOracleHubOpen = false, isScopeOpen = false }: BottomNavigationProps) {
   const [visibleButtons, setVisibleButtons] = useState<number[]>([]);
   const [position, setPosition] = useState({ x: 0, y: 0 }); // 0 = center, 1 = right
   const animationRef = useRef<number | undefined>(undefined);
@@ -89,8 +90,8 @@ export default function BottomNavigation({ isNavigationHubOpen = false, isOracle
   const rightX = typeof window !== 'undefined' ? window.innerWidth - 100 : 0; // 100px from right edge for closer positioning
   const currentX = centerX + (rightX - centerX) * position.x;
 
-  // Hide completely when Oracle is open
-  if (isOracleHubOpen) {
+  // Hide completely when Oracle or Scope is open
+  if (isOracleHubOpen || isScopeOpen) {
     return null;
   }
 

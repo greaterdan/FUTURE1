@@ -115,7 +115,41 @@ const startServer = async () => {
         logger.info('💰 Tracking marketcap from Jupiter, Birdeye, and DexScreener');
         logger.info('📊 Tokens progress: fresh → curve → active (when migrating to AMM)');
 
-        // Start HTTP server
+                // Check if port is already in use and free it
+        const checkAndFreePort = async () => {
+            try {
+                const { exec } = require('child_process');
+                const util = require('util');
+                const execAsync = util.promisify(exec);
+                
+                // Check if port is in use
+                const { stdout } = await execAsync(`lsof -ti:${PORT}`);
+                if (stdout.trim()) {
+                    const pids = stdout.trim().split('\n');
+                    logger.info(`Port ${PORT} is in use by PIDs: ${pids.join(', ')}. Freeing port...`);
+                    
+                    // Kill processes using the port
+                    for (const pid of pids) {
+                        try {
+                            process.kill(parseInt(pid), 'SIGTERM');
+                            logger.info(`Killed process ${pid}`);
+                        } catch (error) {
+                            logger.warn(`Failed to kill process ${pid}:`, error);
+                        }
+                    }
+                    
+                    // Wait a moment for processes to terminate
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+            } catch (error) {
+                // Port is not in use, which is fine
+                logger.debug(`Port ${PORT} is available`);
+            }
+        };
+        
+        // Free port and start server
+        await checkAndFreePort();
+        
         server.listen(PORT, () => {
             logger.info(`🚀 Solana Mint Discovery System is running on port ${PORT}`);
             logger.info(`📊 API available at http://localhost:${PORT}`);

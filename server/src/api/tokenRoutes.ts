@@ -90,4 +90,38 @@ router.get('/', async (_req: Request, res: Response) => {
     }
 });
 
+// GET /tokens/search - Search tokens by name, symbol, or mint address
+router.get('/search', async (req: Request, res: Response) => {
+    try {
+        const query = req.query.q as string;
+        const limit = parseInt(req.query.limit as string) || 50;
+        
+        if (!query || query.trim().length < 2) {
+            return res.status(400).json({
+                error: 'Search query must be at least 2 characters long.'
+            });
+        }
+        
+        if (limit < 1 || limit > 100) {
+            return res.status(400).json({
+                error: 'Invalid limit. Must be between 1 and 100.'
+            });
+        }
+        
+        const tokens = await tokenRepository.searchTokens(query.trim(), limit);
+        
+        logger.info(`Token search completed. Query: "${query}", Results: ${tokens.length}`);
+        
+        return res.json({
+            query: query.trim(),
+            total: tokens.length,
+            items: tokens
+        });
+        
+    } catch (error) {
+        logger.error('Error searching tokens:', error);
+        return res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
 export default router;

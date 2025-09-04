@@ -185,7 +185,7 @@ export default function Page() {
           isOracleHubOpen={isOracleHubOpen}
           setIsOracleHubOpen={saveOracleState}
         />
-        <BottomNavigation isNavigationHubOpen={isNavigationHubOpen} isOracleHubOpen={isOracleHubOpen} />
+        <BottomNavigation isNavigationHubOpen={isNavigationHubOpen} isOracleHubOpen={isOracleHubOpen} isScopeOpen={isScopeOpen} />
         
         {/* SCOPE component - now overlays on top of background */}
         <AnimatePresence mode="wait">

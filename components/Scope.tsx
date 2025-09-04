@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import ImageWithFallback from './ImageWithFallback';
 import SocialBadges from './SocialBadges';
 import HoverImagePreview from './HoverImagePreview';
+import CreationTimeDisplay from './CreationTimeDisplay';
+import TokenSearch from './TokenSearch';
 
 // Typing Indicator Component
 const TypingIndicator: React.FC<{ isTyping: boolean; companionName?: string }> = ({ isTyping, companionName }) => {
@@ -226,6 +228,11 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           <div className="text-white/80 text-sm font-mono truncate">
             {token.symbol || token.mint.slice(0, 4)}
           </div>
+          {/* Creation time display */}
+          <CreationTimeDisplay 
+            createdAt={token.created_at || token.createdAt || new Date()} 
+            className="mt-1"
+          />
         </div>
         
         {/* Copy button */}
@@ -331,7 +338,11 @@ function TokenColumn({
                 {items.length} tokens
               </div>
               {items.map((token, index) => (
-                <div key={`${token.mint}-${token.updated_at || token.created_at || index}`} className={`relative ${index === items.length - 1 ? 'mb-4' : ''}`}>
+                <div 
+                  key={`${token.mint}-${token.updated_at || token.created_at || index}`} 
+                  className={`relative ${index === items.length - 1 ? 'mb-4' : ''}`}
+                  data-mint={token.mint}
+                >
                   <TokenCard 
                     token={token} 
                     visibleMintsRef={visibleMintsRef} 
@@ -373,6 +384,10 @@ export const Scope = ({
 }) => {
   // Track visible mints for performance optimization
   const visibleMintsRef = useRef<Set<string>>(new Set());
+  
+  // Token filtering state
+  const [searchFilteredTokens, setSearchFilteredTokens] = useState<any[]>(tokens);
+  const [isSearchFiltered, setIsSearchFiltered] = useState(false);
   
   // Chat state
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -438,6 +453,45 @@ export const Scope = ({
       localStorage.setItem('scope_conversations', JSON.stringify(conversationHistory));
     }
   }, [conversationHistory]);
+
+  // Handle token selection from search
+  const handleTokenSelect = useCallback((selectedToken: any) => {
+    console.log('Selected token from search:', selectedToken);
+    
+    // Filter tokens to show only the selected token
+    const filtered = tokens.filter(token => token.mint === selectedToken.mint);
+    setSearchFilteredTokens(filtered);
+    setIsSearchFiltered(true);
+    
+    // Scroll to the token if it exists in the current list
+    if (filtered.length > 0) {
+      const tokenElement = document.querySelector(`[data-mint="${selectedToken.mint}"]`);
+      if (tokenElement) {
+        tokenElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [tokens]);
+
+  // Reset filter when tokens change
+  useEffect(() => {
+    if (!isSearchFiltered) {
+      setSearchFilteredTokens(tokens);
+    }
+  }, [tokens, isSearchFiltered]);
+
+  // ESC key handler
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleEscKey);
+      return () => document.removeEventListener('keydown', handleEscKey);
+    }
+  }, [isOpen, onClose]);
 
   // Auto-close chat when Scope closes
   useEffect(() => {
@@ -534,33 +588,38 @@ export const Scope = ({
   // Memoize filtered tokens to prevent recalculation on every render
   const filteredTokens = useMemo(() => {
     console.log("🔍 Filtering tokens:", tokens?.length || 0, "tokens received");
-    if (!tokens || !Array.isArray(tokens) || tokens.length === 0) {
+    
+    // Use search filtered tokens if available, otherwise use all tokens
+    const tokensToFilter = isSearchFiltered ? searchFilteredTokens : tokens;
+    
+    if (!tokensToFilter || !Array.isArray(tokensToFilter) || tokensToFilter.length === 0) {
       console.log("❌ No tokens to filter");
       return { newPairs: [], onEdge: [], filled: [], curveTokens: [] };
     }
     
     // Debug: Log first few tokens to see their structure
-    console.log("🔍 Sample tokens:", tokens.slice(0, 3).map(t => ({
+    console.log("🔍 Sample tokens:", tokensToFilter.slice(0, 3).map(t => ({
       name: t.name,
       symbol: t.symbol,
       status: t.status,
-      isOnCurve: t.isOnCurve
+      isOnCurve: t.isOnCurve // Use transformed property name
     })));
     
-    const newPairs = tokens.filter(t => t && t.status === 'fresh' && !t.isOnCurve);
-    const filled = tokens.filter(t => t && t.status === 'active');
-    const onEdge = tokens.filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.latest_marketcap?.liquidity && t.latest_marketcap.liquidity > 0);
-    const curveTokens = tokens.filter(t => t && (t.status === 'curve' || t.isOnCurve));
+    // Use transformed property names from useServerData
+    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve);
+    const filled = tokensToFilter.filter(t => t && t.status === 'active');
+    const onEdge = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.liquidity && t.liquidity > 0);
+    const curveTokens = tokensToFilter.filter(t => t && (t.status === 'curve' || t.isOnCurve));
     
     console.log("✅ Filtered tokens:", {
       newPairs: newPairs.length,
       onEdge: onEdge.length, 
       filled: filled.length,
       curveTokens: curveTokens.length,
-      total: tokens.length
+      total: tokensToFilter.length
     });
     return { newPairs, onEdge, filled, curveTokens };
-  }, [tokens]);
+  }, [tokens, isSearchFiltered, searchFilteredTokens]);
 
   // Generate smart conversation title based on content
   const generateConversationTitle = useCallback((messages: Array<{ type: 'user' | 'assistant'; content: string; timestamp: Date }>) => {
@@ -764,23 +823,33 @@ export const Scope = ({
            <div className="flex items-center justify-center space-x-4">
              {/* Search Bar */}
              <motion.div 
-               className="w-96"
+               className="flex items-center space-x-2"
                initial={{ y: -10, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
                transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
              >
-               <div className="relative">
-                 <input
-                   type="text"
-                   placeholder="Search by token or CA"
-                   className="w-full px-4 py-2 bg-transparent border border-white/30 rounded-full text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
-                 />
-                 <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                   <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                   </svg>
-                 </div>
-               </div>
+               <TokenSearch 
+                 placeholder="Search by token or CA"
+                 onTokenSelect={handleTokenSelect}
+                 className="w-80"
+               />
+               
+               {/* Reset Filter Button */}
+               {isSearchFiltered && (
+                 <motion.button
+                   initial={{ opacity: 0, scale: 0.8 }}
+                   animate={{ opacity: 1, scale: 1 }}
+                   exit={{ opacity: 0, scale: 0.8 }}
+                   onClick={() => {
+                     setSearchFilteredTokens(tokens);
+                     setIsSearchFiltered(false);
+                   }}
+                   className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-400 text-sm transition-all duration-200 hover:scale-105"
+                   title="Reset filter"
+                 >
+                   Reset
+                 </motion.button>
+               )}
              </motion.div>
              
              {/* Chat Button - Between Search and Close */}

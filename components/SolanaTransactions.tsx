@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import CreationTimeDisplay from './CreationTimeDisplay';
 
 interface TokenTradeAggregation {
   id: number;
@@ -71,7 +72,9 @@ export default function SolanaTransactions() {
             <p>Supply: {trade.supply?.toLocaleString() || 'N/A'}</p>
             <p>Decimals: {trade.decimals || 'N/A'}</p>
             <p>Status: {trade.status || 'N/A'}</p>
-            <p>Created: {trade.created_at ? new Date(trade.created_at).toLocaleString() : 'N/A'}</p>
+            <div className="mt-2">
+              <CreationTimeDisplay createdAt={trade.created_at} />
+            </div>
           </div>
         ))}
       </div>
