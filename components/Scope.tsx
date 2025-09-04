@@ -455,11 +455,17 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
         {/* Avatar container with HoverImagePreview */}
         <div className="relative h-12 w-12 shrink-0 overflow-visible">
-          <HoverImagePreview 
-            src={token.imageUrl ? `http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}` : undefined}
-            alt={token.symbol || token.name || "Token"}
-            thumbClass="h-full w-full object-cover rounded-md"
-          />
+          {token.imageUrl ? (
+            <HoverImagePreview 
+              src={`http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}`}
+              alt={token.symbol || token.name || "Token"}
+              thumbClass="h-full w-full object-cover rounded-md"
+            />
+          ) : (
+            <div className="h-full w-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold rounded-md">
+              {(token.symbol || token.name || "T").slice(0, 2).toUpperCase()}
+            </div>
+          )}
         </div>
         
         {/* Token info */}
@@ -527,7 +533,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       
       {/* Badges row */}
       <div className="mt-3 flex items-center gap-2">
-        <SocialBadges links={token.links} mint={token.mint} />
+        <SocialBadges links={token.links} />
         <span className="text-xs text-white/30 font-mono ml-auto">
           {token.mint.slice(0, 4)}...{token.mint.slice(-4)}
         </span>
@@ -870,8 +876,8 @@ export const Scope = ({
     })));
     
     // Use transformed property names from useServerData and limit to 30 tokens each
-    const newPairs = tokensToFilter.filter(t => t && t.status === 'active').slice(0, 30); // Show active tokens with metadata
-    const filled = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve).slice(0, 30); // Show fresh tokens
+    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh').slice(0, 30); // Show fresh tokens (the actual fresh mints)
+    const filled = tokensToFilter.filter(t => t && t.status === 'active' && !t.isOnCurve).slice(0, 30); // Show active tokens
     // EDGE: Fresh tokens sorted by marketcap (highest to lowest, up to 84K)
     const onEdge = tokensToFilter
       .filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.marketcap && t.marketcap !== 'null' && t.marketcap !== '0')
