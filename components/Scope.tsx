@@ -9,6 +9,238 @@ import HoverImagePreview from './HoverImagePreview';
 import CreationTimeDisplay from './CreationTimeDisplay';
 import TokenSearch from './TokenSearch';
 
+// Star Button Component
+const StarButton: React.FC<{ tokenMint: string }> = ({ tokenMint }) => {
+  const { isInWatchlist, addToWatchlist, removeFromWatchlist } = React.useContext(WatchlistContext);
+  const isStarred = isInWatchlist(tokenMint);
+
+  const handleStarClick = () => {
+    if (isStarred) {
+      removeFromWatchlist(tokenMint);
+    } else {
+      addToWatchlist(tokenMint);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleStarClick}
+      className="p-1 bg-white/10 hover:bg-white/20 rounded border border-white/20 transition-all duration-200 flex items-center shrink-0"
+    >
+      <svg 
+        className={`w-4 h-4 transition-colors duration-200 ${
+          isStarred ? 'text-yellow-400' : 'text-white/60 hover:text-white'
+        }`} 
+        fill={isStarred ? 'currentColor' : 'none'} 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <path 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          strokeWidth={2} 
+          d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" 
+        />
+      </svg>
+    </button>
+  );
+};
+
+// Watchlist Context
+const WatchlistContext = React.createContext<{
+  watchlist: Set<string>;
+  addToWatchlist: (mint: string) => void;
+  removeFromWatchlist: (mint: string) => void;
+  isInWatchlist: (mint: string) => boolean;
+}>({
+  watchlist: new Set(),
+  addToWatchlist: () => {},
+  removeFromWatchlist: () => {},
+  isInWatchlist: () => false,
+});
+
+// Watchlist Provider Component
+const WatchlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
+
+  const addToWatchlist = useCallback((mint: string) => {
+    setWatchlist(prev => new Set([...prev, mint]));
+  }, []);
+
+  const removeFromWatchlist = useCallback((mint: string) => {
+    setWatchlist(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(mint);
+      return newSet;
+    });
+  }, []);
+
+  const isInWatchlist = useCallback((mint: string) => {
+    return watchlist.has(mint);
+  }, [watchlist]);
+
+  return (
+    <WatchlistContext.Provider value={{ watchlist, addToWatchlist, removeFromWatchlist, isInWatchlist }}>
+      {children}
+    </WatchlistContext.Provider>
+  );
+};
+
+// Watchlist Popup Component
+const WatchlistPopup: React.FC<{ 
+  isOpen: boolean; 
+  onClose: () => void; 
+  tokens: any[]; 
+}> = ({ isOpen, onClose, tokens }) => {
+  const { watchlist, removeFromWatchlist, isInWatchlist } = React.useContext(WatchlistContext);
+  
+  const watchlistTokens = tokens.filter(token => isInWatchlist(token.mint));
+
+  if (!isOpen) return null;
+
+  return (
+    <motion.div
+      className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-black/90 border border-white/20 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden"
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-white">Watchlist</h2>
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-white transition-colors duration-200"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="overflow-y-auto max-h-[60vh]">
+          {watchlistTokens.length === 0 ? (
+            <div className="text-center text-white/60 py-8">
+              <div className="text-4xl mb-4">⭐</div>
+              <div className="text-lg">No tokens in watchlist yet</div>
+              <div className="text-sm text-white/40 mt-2">Click the star on any token to add it here</div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {watchlistTokens.map((token) => (
+                <div
+                  key={token.mint}
+                  className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10"
+                >
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                      {token.imageUrl ? (
+                        <img
+                          src={`http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}`}
+                          alt={token.symbol || token.name || "Token"}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                          {token.symbol?.slice(0, 2) || token.mint.slice(0, 2)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-white font-semibold">
+                        <span className="text-white/80 text-sm font-mono font-bold uppercase">
+                          {token.symbol || token.mint.slice(0, 4)}
+                        </span>
+                        <span className="ml-2">
+                          {token.name || token.symbol || `${token.mint.slice(0, 4)}…${token.mint.slice(-4)}`}
+                        </span>
+                      </div>
+                      <div className="text-white/60 text-sm">
+                        {token.mint.slice(0, 8)}...{token.mint.slice(-8)}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeFromWatchlist(token.mint)}
+                    className="p-2 text-yellow-400 hover:text-yellow-300 transition-colors duration-200"
+                    title="Remove from watchlist"
+                  >
+                    <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                      <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Header Star Button Component
+const HeaderStarButton: React.FC<{ tokens: any[] }> = ({ tokens }) => {
+  const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
+  const { watchlist } = React.useContext(WatchlistContext);
+
+  const handleStarClick = () => {
+    setIsWatchlistOpen(!isWatchlistOpen);
+  };
+
+  return (
+    <>
+      <motion.button
+        onClick={handleStarClick}
+        className={`relative p-2 rounded-full transition-all duration-300 ${
+          watchlist.size > 0
+            ? 'bg-gradient-to-r from-yellow-500/20 to-yellow-600/20 border border-yellow-500/30 shadow-lg shadow-yellow-500/20'
+            : 'bg-black/20 hover:bg-black/40 border border-gray-700 shadow-md shadow-black/30'
+        }`}
+        initial={{ x: 20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        whileHover={{ scale: 1.1 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <svg 
+          className={`w-5 h-5 transition-colors duration-200 ${
+            watchlist.size > 0 ? 'text-yellow-400' : 'text-white'
+          }`} 
+          fill={watchlist.size > 0 ? 'currentColor' : 'none'} 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" 
+          />
+        </svg>
+        {watchlist.size > 0 && (
+          <span className="absolute -top-1 -right-1 bg-yellow-400 text-black text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold border-2 border-black">
+            {watchlist.size}
+          </span>
+        )}
+      </motion.button>
+      
+      <WatchlistPopup 
+        isOpen={isWatchlistOpen} 
+        onClose={() => setIsWatchlistOpen(false)} 
+        tokens={tokens}
+      />
+    </>
+  );
+};
+
 // Format marketcap with K/M suffixes
 const formatMarketcap = (value: number): string => {
   if (value >= 1000000) {
@@ -236,12 +468,23 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
         </div>
         
         {/* Token info */}
-        <div className="min-w-0">
-          <h3 className="text-white font-semibold truncate">
-            {token.name || token.symbol || `${token.mint.slice(0, 4)}…${token.mint.slice(-4)}`}
-          </h3>
-          <div className="text-white/80 text-sm font-mono font-bold truncate uppercase">
-            {token.symbol || token.mint.slice(0, 4)}
+        <div className="min-w-0 flex-1">
+          <div className="text-white font-semibold truncate flex items-center gap-2">
+            <span className="text-white/80 text-sm font-mono font-bold uppercase">
+              {token.symbol || token.mint.slice(0, 4)}
+            </span>
+            <span>
+              {token.name || token.symbol || `${token.mint.slice(0, 4)}…${token.mint.slice(-4)}`}
+            </span>
+            {/* Copy button */}
+            <button
+              onClick={copyMintAddress}
+              className="p-1 bg-white/10 hover:bg-white/20 text-white/60 hover:text-white rounded border border-white/20 transition-all duration-200 flex items-center shrink-0"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
           </div>
           {/* Creation time display */}
           <CreationTimeDisplay 
@@ -250,16 +493,8 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           />
         </div>
         
-        {/* Copy button */}
-        <button
-          onClick={copyMintAddress}
-          className="px-2 py-1 bg-white/10 hover:bg-white/20 text-white/60 hover:text-white text-xs rounded border border-white/20 transition-all duration-200 flex items-center space-x-1 shrink-0"
-        >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <span>Copy</span>
-        </button>
+        {/* Star button */}
+        <StarButton tokenMint={token.mint} />
       </div>
       
       {/* Metrics row */}
@@ -897,73 +1132,76 @@ export const Scope = ({
         transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
       >
         <div className="grid grid-cols-3 items-center">
-                      {/* Left side - SCOPE title only */}
-            <div className="flex items-center">
-              <motion.h1 
-                className="text-2xl font-bold text-white"
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-              >
-                SCOPE
-              </motion.h1>
-            </div>
-          
-                     {/* Center - Search Bar + Chat Button (same row) */}
-           <div className="flex items-center justify-center space-x-4">
-             {/* Search Bar */}
-             <motion.div 
-               className="flex items-center space-x-2"
-               initial={{ y: -10, opacity: 0 }}
-               animate={{ y: 0, opacity: 1 }}
-               transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-             >
-               <TokenSearch 
-                 placeholder="Search by token or CA"
-                 onTokenSelect={handleTokenSelect}
-                 className="w-80"
-               />
-               
-               {/* Reset Filter Button */}
-               {isSearchFiltered && (
-                 <motion.button
-                   initial={{ opacity: 0, scale: 0.8 }}
-                   animate={{ opacity: 1, scale: 1 }}
-                   exit={{ opacity: 0, scale: 0.8 }}
-                   onClick={() => {
-                     setSearchFilteredTokens(tokens);
-                     setIsSearchFiltered(false);
-                   }}
-                   className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-400 text-sm transition-all duration-200 hover:scale-105"
-                   title="Reset filter"
-                 >
-                   Reset
-                 </motion.button>
-               )}
-             </motion.div>
-             
-             {/* Robot Button - Between Search and Close */}
-             <motion.button
-               onClick={() => setIsChatOpen(!isChatOpen)}
-               className={`p-2 rounded-full transition-all duration-300 ${
-                 isChatOpen 
-                   ? 'bg-gradient-to-r from-gray-800 to-black shadow-lg shadow-black/50 border border-gray-600' 
-                   : 'bg-black/20 hover:bg-black/40 border border-gray-700 shadow-md shadow-black/30'
-               }`}
-               initial={{ y: -10, opacity: 0 }}
-               animate={{ y: 0, opacity: 1 }}
-               transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-               whileHover={{ scale: 1.1 }}
-               whileTap={{ scale: 0.95 }}
-             >
-               <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                 <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 6.5V7.5C15 8.3 14.3 9 13.5 9H10.5C9.7 9 9 8.3 9 7.5V6.5L3 7V9L9 8.5V9.5C9 10.3 9.7 11 10.5 11H13.5C14.3 11 15 10.3 15 9.5V8.5L21 9ZM7.5 12C6.7 12 6 12.7 6 13.5V16.5C6 17.3 6.7 18 7.5 18S9 17.3 9 16.5V13.5C9 12.7 8.3 12 7.5 12ZM16.5 12C15.7 12 15 12.7 15 13.5V16.5C15 17.3 15.7 18 16.5 18S18 17.3 18 16.5V13.5C18 12.7 17.3 12 16.5 12ZM12 13.5C11.2 13.5 10.5 14.2 10.5 15V17C10.5 17.8 11.2 18.5 12 18.5S13.5 17.8 13.5 17V15C13.5 14.2 12.8 13.5 12 13.5Z"/>
-               </svg>
-             </motion.button>
-           </div>
-          
-          {/* Right side - Close Button */}
-          <div className="flex justify-end">
+          {/* Left side - SCOPE title only */}
+          <div className="flex items-center">
+            <motion.h1 
+              className="text-2xl font-bold text-white"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              SCOPE
+            </motion.h1>
+          </div>
+        
+          {/* Center - Search Bar */}
+          <div className="flex items-center justify-center">
+            <motion.div 
+              className="flex items-center space-x-2"
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <TokenSearch 
+                placeholder="Search by token or CA"
+                onTokenSelect={handleTokenSelect}
+                className="w-80"
+              />
+              
+              {/* Reset Filter Button */}
+              {isSearchFiltered && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  onClick={() => {
+                    setSearchFilteredTokens(tokens);
+                    setIsSearchFiltered(false);
+                  }}
+                  className="px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-red-400 text-sm transition-all duration-200 hover:scale-105"
+                  title="Reset filter"
+                >
+                  Reset
+                </motion.button>
+              )}
+            </motion.div>
+          </div>
+        
+          {/* Right side - Robot Button, Star Button, Close Button */}
+          <div className="flex justify-end items-center space-x-3">
+            {/* Robot Button */}
+            <motion.button
+              onClick={() => setIsChatOpen(!isChatOpen)}
+              className={`p-2 rounded-full transition-all duration-300 ${
+                isChatOpen 
+                  ? 'bg-gradient-to-r from-gray-800 to-black shadow-lg shadow-black/50 border border-gray-600' 
+                  : 'bg-black/20 hover:bg-black/40 border border-gray-700 shadow-md shadow-black/30'
+              }`}
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 6.5V7.5C15 8.3 14.3 9 13.5 9H10.5C9.7 9 9 8.3 9 7.5V6.5L3 7V9L9 8.5V9.5C9 10.3 9.7 11 10.5 11H13.5C14.3 11 15 10.3 15 9.5V8.5L21 9ZM7.5 12C6.7 12 6 12.7 6 13.5V16.5C6 17.3 6.7 18 7.5 18S9 17.3 9 16.5V13.5C9 12.7 8.3 12 7.5 12ZM16.5 12C15.7 12 15 12.7 15 13.5V16.5C15 17.3 15.7 18 16.5 18S18 17.3 18 16.5V13.5C18 12.7 17.3 12 16.5 12ZM12 13.5C11.2 13.5 10.5 14.2 10.5 15V17C10.5 17.8 11.2 18.5 12 18.5S13.5 17.8 13.5 17V15C13.5 14.2 12.8 13.5 12 13.5Z"/>
+              </svg>
+            </motion.button>
+
+            {/* Star Button */}
+            <HeaderStarButton tokens={tokens} />
+
+            {/* Close Button */}
             <motion.button
               onClick={() => {
                 // Clean up state immediately when closing
@@ -1624,5 +1862,20 @@ export const Scope = ({
   );
 };
 
-export default Scope;
+// Wrapped Scope component with WatchlistProvider
+const ScopeWithWatchlist: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  tokens: any[];
+  isLoading: boolean;
+  lastUpdate: string | null;
+}> = (props) => {
+  return (
+    <WatchlistProvider>
+      <Scope {...props} />
+    </WatchlistProvider>
+  );
+};
+
+export default ScopeWithWatchlist;
 

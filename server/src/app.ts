@@ -68,7 +68,7 @@ app.get('/', (_req, res) => {
         },
         features: {
             mint_discovery: 'Real-time InitializeMint detection via Helius WebSocket',
-            marketcap_tracking: 'Automatic price updates every 30 seconds from Birdeye API',
+            marketcap_tracking: 'Automatic price updates every 5 seconds from Birdeye API',
             status_tracking: 'Tokens progress from fresh → active based on liquidity'
         },
         documentation: 'Simplified mint discovery and marketcap tracking system'
