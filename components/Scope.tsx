@@ -55,16 +55,18 @@ export function useVisibility(mint: string, visibleMintsRef: React.MutableRefObj
 }
 
 // Memoized TokenCard for performance
-type CardProps = { 
-  token: any; 
+type CardProps = {
+  token: any;
   visibleMintsRef: React.MutableRefObject<Set<string>>;
   onCompanionAttached?: (companionName: string, token: any) => void;
   agents: Array<{ name: string; videoFile: string }>;
+  attachedCompanion?: string | null;
+  onCompanionDetach?: (tokenMint: string) => void;
 };
-const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents }) => {
+const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [attachedCompanion, setAttachedCompanion] = useState<string | null>(null);
+  
   
   const copyMintAddress = async () => {
     try {
@@ -108,9 +110,6 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     if (agentName) {
       console.log(`Agent ${agentName} dropped on token ${token.mint}`);
       
-      // Set the attached companion
-      setAttachedCompanion(agentName);
-      
       // Add a success animation
       const card = e.currentTarget as HTMLElement;
       card.style.transform = 'scale(1.05)';
@@ -119,10 +118,6 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       setTimeout(() => {
         card.style.transform = 'scale(1)';
       }, 200);
-      
-      // Here you can add logic to handle the agent-token interaction
-      // For example, open chat with the agent analyzing this specific token
-      // You could emit an event or call a callback to open the chat panel
       
       // Notify parent component about companion attachment
       if (onCompanionAttached) {
@@ -134,14 +129,8 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
   };
   
   return (
-    <motion.div
+    <div
       ref={cardRef}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ 
-        duration: 0.15,
-        ease: "easeOut"
-      }}
       className={`relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-105 hover:z-10 transition-all duration-200 token-card ${
         isDragOver && !attachedCompanion
           ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]' 
@@ -174,37 +163,52 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-20"
+          className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-20 group"
         >
-          <div className="w-12 h-12 rounded-full overflow-hidden bg-transparent companion-video">
-            {/* Find the agent video for this companion */}
-            {(() => {
-              const agent = agents.find(a => a.name === attachedCompanion);
-              return agent ? (
-                <video 
-                  className="w-full h-full object-cover"
-                  autoPlay 
-                  muted 
-                  loop
-                  playsInline
-                  style={{ 
-                    mixBlendMode: 'screen',
-                    filter: 'brightness(1.2) contrast(1.1)',
-                    background: 'transparent',
-                    backgroundColor: 'transparent',
-                    backgroundImage: 'none'
-                  }}
-                >
-                  <source src={agent.videoFile} type="video/webm" />
-                </video>
-              ) : (
-                <div className="w-full h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
-                  <span className="text-white font-bold text-xs">
-                    {attachedCompanion.split(' ').map(word => word[0]).join('')}
-                  </span>
-                </div>
-              );
-            })()}
+          <div className="relative">
+            <div className="w-12 h-12 rounded-full overflow-hidden bg-transparent companion-video">
+              {/* Find the agent video for this companion */}
+              {(() => {
+                const agent = agents.find(a => a.name === attachedCompanion);
+                return agent ? (
+                  <video 
+                    className="w-full h-full object-cover"
+                    autoPlay 
+                    muted 
+                    loop
+                    playsInline
+                    style={{ 
+                      mixBlendMode: 'screen',
+                      filter: 'brightness(1.2) contrast(1.1)',
+                      background: 'transparent',
+                      backgroundColor: 'transparent',
+                      backgroundImage: 'none'
+                    }}
+                  >
+                    <source src={agent.videoFile} type="video/webm" />
+                  </video>
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
+                    <span className="text-white font-bold text-xs">
+                      {attachedCompanion.split(' ').map(word => word[0]).join('')}
+                    </span>
+                  </div>
+                );
+              })()}
+            </div>
+            {/* Detach button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onCompanionDetach) {
+                  onCompanionDetach(token.mint);
+                }
+              }}
+              className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+              title="Detach companion"
+            >
+              ×
+            </button>
           </div>
         </motion.div>
       )}
@@ -212,7 +216,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       {/* Header row: avatar, name/symbol, copy button */}
       <div className="grid grid-cols-[auto_1fr_auto] items-start gap-3">
         {/* Avatar container with HoverImagePreview */}
-        <div className="relative h-9 w-9 shrink-0 overflow-visible">
+        <div className="relative h-12 w-12 shrink-0 overflow-visible">
           <HoverImagePreview 
             src={token.imageUrl ? `http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}` : `https://api.dicebear.com/8.x/shapes/svg?seed=${token.mint}`}
             alt={token.symbol || token.name || "Token"}
@@ -285,7 +289,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           {token.mint.slice(0, 4)}...{token.mint.slice(-4)}
         </span>
       </div>
-    </motion.div>
+    </div>
   );
 });
 
@@ -301,7 +305,8 @@ const shallowPickEq = (a: any, b: any) =>
   JSON.stringify(a.links) === JSON.stringify(a.links);
 
 export const TokenCard = React.memo(TokenCardBase, (prev, next) =>
-  shallowPickEq(prev.token, next.token)
+  shallowPickEq(prev.token, next.token) &&
+  prev.attachedCompanion === next.attachedCompanion
 );
 
 // Token Column
@@ -311,7 +316,10 @@ function TokenColumn({
   className = "",
   visibleMintsRef,
   onCompanionAttached,
-  agents
+  agents,
+  newTokenMint,
+  attachedCompanions,
+  onCompanionDetach
 }: { 
   title: string; 
   items: any[]; 
@@ -319,6 +327,9 @@ function TokenColumn({
   visibleMintsRef: React.MutableRefObject<Set<string>>;
   onCompanionAttached?: (companionName: string, token: any) => void;
   agents: Array<{ name: string; videoFile: string }>;
+  newTokenMint: string | null;
+  attachedCompanions: Record<string, string>;
+  onCompanionDetach?: (tokenMint: string) => void;
 }) {
 
   return (
@@ -337,20 +348,50 @@ function TokenColumn({
               <div className="text-xs text-white/40 mb-2 text-center">
                 {items.length} tokens
               </div>
-              {items.map((token, index) => (
-                <div 
-                  key={`${token.mint}-${token.updated_at || token.created_at || index}`} 
-                  className={`relative ${index === items.length - 1 ? 'mb-4' : ''}`}
-                  data-mint={token.mint}
-                >
-                  <TokenCard 
-                    token={token} 
-                    visibleMintsRef={visibleMintsRef} 
-                    onCompanionAttached={onCompanionAttached}
-                    agents={agents}
-                  />
-                </div>
-              ))}
+              {items.map((token, index) => {
+                const isNewToken = newTokenMint === token.mint;
+                const companionForToken = attachedCompanions[token.mint] || null;
+                return (
+                  <div 
+                    key={`${token.mint}-${token.updated_at || token.created_at || index}`} 
+                    className={`relative ${index === items.length - 1 ? 'mb-4' : ''}`}
+                    data-mint={token.mint}
+                  >
+                    {isNewToken ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: -20, scale: 0.95 }}
+                        animate={{ 
+                          opacity: 1, 
+                          y: 0, 
+                          scale: 1
+                        }}
+                        transition={{ 
+                          duration: 0.3,
+                          ease: [0.25, 0.46, 0.45, 0.94]
+                        }}
+                      >
+                        <TokenCard 
+                          token={token} 
+                          visibleMintsRef={visibleMintsRef} 
+                          onCompanionAttached={onCompanionAttached}
+                          agents={agents}
+                          attachedCompanion={companionForToken}
+                          onCompanionDetach={onCompanionDetach}
+                        />
+                      </motion.div>
+                    ) : (
+                      <TokenCard 
+                        token={token} 
+                        visibleMintsRef={visibleMintsRef} 
+                        onCompanionAttached={onCompanionAttached}
+                        agents={agents}
+                        attachedCompanion={attachedCompanions[token.mint] || null}
+                        onCompanionDetach={onCompanionDetach}
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </>
           )}
         </div>
@@ -369,6 +410,7 @@ export const Scope = ({
   live, 
   resumeLive, 
   pauseLive,
+  newTokenMint,
   onClose
 }: { 
   isOpen: boolean;
@@ -380,10 +422,32 @@ export const Scope = ({
   live: boolean;
   resumeLive: () => void;
   pauseLive: () => void;
+  newTokenMint: string | null;
   onClose: () => void;
 }) => {
   // Track visible mints for performance optimization
   const visibleMintsRef = useRef<Set<string>>(new Set());
+  
+  // Track companion attachments globally to persist across re-renders
+  const [attachedCompanions, setAttachedCompanions] = useState<Record<string, string>>({});
+  
+  
+  // Handle companion attachment
+  const handleCompanionAttached = (companionName: string, token: any) => {
+    setAttachedCompanions(prev => ({
+      ...prev,
+      [token.mint]: companionName
+    }));
+  };
+  
+  // Handle companion detach
+  const handleCompanionDetach = (tokenMint: string) => {
+    setAttachedCompanions(prev => {
+      const newState = { ...prev };
+      delete newState[tokenMint];
+      return newState;
+    });
+  };
   
   // Token filtering state
   const [searchFilteredTokens, setSearchFilteredTokens] = useState<any[]>(tokens);
@@ -937,7 +1001,13 @@ export const Scope = ({
                 className="border-r border-gray-700 flex-1"
                 visibleMintsRef={visibleMintsRef}
                 agents={agents}
+                newTokenMint={newTokenMint}
+                attachedCompanions={attachedCompanions}
+                onCompanionDetach={handleCompanionDetach}
                 onCompanionAttached={(companionName, token) => {
+                  // Handle companion attachment
+                  handleCompanionAttached(companionName, token);
+                  
                   // Auto-open chat and simulate companion analysis
                   if (!isChatOpen) {
                     setIsChatOpen(true);
@@ -994,7 +1064,13 @@ export const Scope = ({
                 className="border-r border-gray-700 flex-1"
                 visibleMintsRef={visibleMintsRef}
                 agents={agents}
+                newTokenMint={newTokenMint}
+                attachedCompanions={attachedCompanions}
+                onCompanionDetach={handleCompanionDetach}
                 onCompanionAttached={(companionName, token) => {
+                  // Handle companion attachment
+                  handleCompanionAttached(companionName, token);
+                  
                   // Auto-open chat and simulate companion analysis
                   if (!isChatOpen) {
                     setIsChatOpen(true);
@@ -1052,7 +1128,13 @@ export const Scope = ({
                 className="flex-1"
                 visibleMintsRef={visibleMintsRef}
                 agents={agents}
+                newTokenMint={newTokenMint}
+                attachedCompanions={attachedCompanions}
+                onCompanionDetach={handleCompanionDetach}
                 onCompanionAttached={(companionName, token) => {
+                  // Handle companion attachment
+                  handleCompanionAttached(companionName, token);
+                  
                   // Auto-open chat and simulate companion analysis
                   if (!isChatOpen) {
                     setIsChatOpen(true);

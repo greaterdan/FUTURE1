@@ -112,6 +112,7 @@ export const useServerData = (isOpen: boolean) => {
     activeTokens: 0
   });
   const [live, setLive] = useState<boolean>(true);
+  const [newTokenMint, setNewTokenMint] = useState<string | null>(null);
 
   // WebSocket connection for real-time updates
   const wsUrl = process.env.NODE_ENV === 'production' 
@@ -136,7 +137,29 @@ export const useServerData = (isOpen: boolean) => {
       const items = data?.items ?? (Array.isArray(data) ? data : []);
       
       const transformedTokens = items.map(transformTokenData);
-      setTokens(transformedTokens);
+      
+      // Merge with existing tokens to prevent duplicates and preserve WebSocket-added tokens
+      setTokens(prev => {
+        const existingMints = new Set(prev.map(t => t.mint));
+        const newTokens = transformedTokens.filter((t: any) => !existingMints.has(t.mint));
+        
+        // If there are new tokens from server, add them to the beginning
+        if (newTokens.length > 0) {
+          console.log(`📥 Added ${newTokens.length} new tokens from server refresh`);
+          const combined = [...newTokens, ...prev];
+          // Limit to 200 tokens to prevent memory issues
+          return combined.slice(0, 200);
+        }
+        
+        // If no new tokens, just update existing ones with fresh data
+        const updatedTokens = prev.map(existingToken => {
+          const serverToken = transformedTokens.find((t: any) => t.mint === existingToken.mint);
+          return serverToken || existingToken;
+        });
+        
+        return updatedTokens;
+      });
+      
       setLastUpdate(new Date());
       setConnectionStatus(wsConnected ? "Connected to server (Live)" : "Connected to server");
       
@@ -221,11 +244,25 @@ export const useServerData = (isOpen: boolean) => {
   useEffect(() => {
     if (lastMessage) {
       if (lastMessage.type === 'new_token') {
-        // Add new token to the list
+        // Add new token to the list (check for duplicates)
         const newToken = transformTokenData(lastMessage.data);
-        setTokens(prev => [newToken, ...prev]);
+        setTokens(prev => {
+          // Check if token already exists
+          const exists = prev.some(token => token.mint === newToken.mint);
+          if (exists) {
+            console.log('⚠️ DUPLICATE TOKEN PREVENTED:', newToken.mint);
+            return prev;
+          }
+          const combined = [newToken, ...prev];
+          // Limit to 200 tokens to prevent memory issues
+          return combined.slice(0, 200);
+        });
         setLastUpdate(new Date());
+        setNewTokenMint(newToken.mint);
         console.log('🔥 NEW TOKEN ADDED:', newToken.name || newToken.symbol || newToken.mint);
+        
+        // Clear the flag after animation
+        setTimeout(() => setNewTokenMint(null), 1000);
       } else if (lastMessage.type === 'token_update') {
         // Update existing token
         const updatedToken = transformTokenData(lastMessage.data);
@@ -265,6 +302,7 @@ export const useServerData = (isOpen: boolean) => {
     pauseLive,
     searchTokens,
     filterByStatus,
-    refresh: fetchTokens
+    refresh: fetchTokens,
+    newTokenMint
   };
 };

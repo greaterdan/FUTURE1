@@ -52,6 +52,13 @@ app.get('/health', (_req, res) => {
 // API routes
 app.use('/api/tokens', tokenRoutes);
 app.get('/api/img', imageProxy);
+app.options('/api/img', (req, res) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  res.status(200).end();
+});
 
 // Root endpoint
 app.get('/', (_req, res) => {

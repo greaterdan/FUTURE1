@@ -20,6 +20,13 @@ export async function imageProxy(req: Request, res: Response): Promise<void> {
     }
     
     const ct = r.headers.get("content-type") || "image/*";
+    
+    // Set CORS headers to allow cross-origin access
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    
     res.setHeader("Content-Type", ct);
     res.setHeader("Cache-Control", "public, max-age=300");
     

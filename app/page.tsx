@@ -40,6 +40,7 @@ export default function Page() {
     searchTokens,
     filterByStatus,
     refresh,
+    newTokenMint,
   } = useServerData(true); // Always true - monitoring NEVER stops, regardless of Scope state
 
 
@@ -201,6 +202,7 @@ export default function Page() {
               live={live}
               resumeLive={resumeLive}
               pauseLive={pauseLive}
+              newTokenMint={newTokenMint}
               onClose={() => saveScopeState(false)}
             />
           )}
