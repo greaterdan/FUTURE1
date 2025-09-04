@@ -121,7 +121,7 @@ export class MarketcapUpdaterService {
         }
     }
 
-    private isTargetToken(token: any): boolean {
+    private isTargetToken(_token: any): boolean {
         // Process ALL tokens immediately - Birdeye API has data for new tokens
         return true;
     }
@@ -184,7 +184,12 @@ export class MarketcapUpdaterService {
                         marketData.liquidity
                     );
                     logger.info(`✅ Saved marketcap data for ${contractAddress}: $${marketData.marketcap}`);
-                } catch (saveError) {
+                } catch (saveError: any) {
+                    // Check if it's a database connection error
+                    if (saveError.message && saveError.message.includes('pool')) {
+                        logger.warn(`⚠️ Database connection issue for ${contractAddress}, skipping this update`);
+                        return; // Skip this update but don't crash the service
+                    }
                     logger.error(`❌ Failed to save marketcap data for ${contractAddress}:`, saveError);
                 }
                 

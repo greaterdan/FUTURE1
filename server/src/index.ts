@@ -50,7 +50,14 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // Graceful shutdown function
+let isShuttingDown = false;
 const gracefulShutdown = async (signal: string) => {
+    if (isShuttingDown) {
+        logger.info('Shutdown already in progress, ignoring signal:', signal);
+        return;
+    }
+    
+    isShuttingDown = true;
     logger.info(`Received ${signal}. Starting graceful shutdown...`);
     
     try {
@@ -86,17 +93,7 @@ const gracefulShutdown = async (signal: string) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (error) => {
-    logger.error('Uncaught Exception:', error);
-    gracefulShutdown('uncaughtException');
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (reason, promise) => {
-    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-    gracefulShutdown('unhandledRejection');
-});
+// Remove duplicate handlers - they're already defined above
 
 // Start the server
 const startServer = async () => {

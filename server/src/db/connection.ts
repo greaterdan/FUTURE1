@@ -63,7 +63,9 @@ class DatabaseConnection {
     }
 
     public async close(): Promise<void> {
-        await this.pool.end();
+        if (this.pool && !this.pool.ended) {
+            await this.pool.end();
+        }
     }
 
     public async testConnection(): Promise<boolean> {
