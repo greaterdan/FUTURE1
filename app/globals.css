@@ -89,11 +89,13 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
   overflow: hidden !important;
 }
 
-/* Ensure cursor is always visible on Scope and Oracle pages */
+/* Ensure cursor is always visible on Scope, Oracle, and Navigation pages */
 .scope-container,
 .scope-container *,
 .oracle-hub,
-.oracle-hub * {
+.oracle-hub *,
+.navigation-hub,
+.navigation-hub * {
   cursor: default !important;
 }
 
@@ -106,7 +108,25 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
 .scope-container a,
 .scope-container .cursor-pointer,
 .scope-container .cursor-grab,
-.scope-container .cursor-grabbing {
+.scope-container .cursor-grabbing,
+.oracle-hub button,
+.oracle-hub [role="button"],
+.oracle-hub input,
+.oracle-hub textarea,
+.oracle-hub select,
+.oracle-hub a,
+.oracle-hub .cursor-pointer,
+.oracle-hub .cursor-grab,
+.oracle-hub .cursor-grabbing,
+.navigation-hub button,
+.navigation-hub [role="button"],
+.navigation-hub input,
+.navigation-hub textarea,
+.navigation-hub select,
+.navigation-hub a,
+.navigation-hub .cursor-pointer,
+.navigation-hub .cursor-grab,
+.navigation-hub .cursor-grabbing {
   cursor: inherit !important;
 }
 

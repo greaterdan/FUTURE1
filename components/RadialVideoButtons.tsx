@@ -1,7 +1,5 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import NavigationHub from "./NavigationHub";
-import OracleHub from "./OracleHub";
 
 interface RadialVideoButtonsProps {
   isNavigationHubOpen: boolean;
@@ -291,17 +289,6 @@ export default function RadialVideoButtons({ isNavigationHubOpen, setIsNavigatio
         </div>
       )}
       
-      {/* Navigation Hub */}
-      <NavigationHub 
-        isOpen={isNavigationHubOpen} 
-        onClose={() => setIsNavigationHubOpen(false)} 
-      />
-      
-      {/* Oracle Hub */}
-      <OracleHub 
-        isOpen={isOracleHubOpen} 
-        onClose={() => setIsOracleHubOpen(false)} 
-      />
     </>
   );
 }

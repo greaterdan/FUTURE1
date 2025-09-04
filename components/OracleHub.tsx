@@ -38,7 +38,7 @@ export default function OracleHub({ isOpen, onClose }: OracleHubProps) {
       
       {/* Oracle Hub - STRICTLY constrained to right half only */}
       <div 
-        className={`fixed right-0 top-0 h-full w-1/2 bg-black border-l border-white/20 z-[60] transition-all duration-700 ease-in-out flex flex-col overflow-hidden ${
+        className={`oracle-hub fixed right-0 top-0 h-full w-1/2 bg-black border-l border-white/20 z-[60] transition-all duration-700 ease-in-out flex flex-col overflow-hidden ${
           animateIn ? 'translate-x-0' : 'translate-x-full'
         } ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
         style={{

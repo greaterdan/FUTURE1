@@ -1,5 +1,6 @@
 import { tokenRepository, marketCapRepository } from '../db/repository';
 import { logger } from '../utils/logger';
+import { WebSocketService } from '../api/websocket';
 
 interface MarketData {
     price_usd: number;
@@ -11,12 +12,17 @@ interface MarketData {
 export class MarketcapUpdaterService {
     private isRunning: boolean = false; 
     private intervalId: NodeJS.Timeout | null = null;
-    private jupiterApiKey: string;
     private birdeyeApiKey: string;
+    private wsService: WebSocketService;
+    private requestQueue: Array<() => Promise<void>> = [];
+    private isProcessingQueue: boolean = false;
+    private lastRequestTime: number = 0;
+    private currentBatchIndex: number = 0; // Track which batch we're processing
+    private readonly RATE_LIMIT_MS = 1000; // 1 second between requests (60 RPM = 1 request per second)
 
-    constructor(jupiterApiKey: string, birdeyeApiKey: string) {
-        this.jupiterApiKey = jupiterApiKey;
+    constructor(birdeyeApiKey: string, wsService: WebSocketService) {
         this.birdeyeApiKey = birdeyeApiKey;
+        this.wsService = wsService;
     }
 
     async start(): Promise<void> {
@@ -26,18 +32,20 @@ export class MarketcapUpdaterService {
         }
 
         try {
-            logger.info('Starting marketcap updater service...');
+            logger.info('🚀 Starting marketcap updater service...');
+            logger.info(`🔑 Birdeye API Key configured: ${this.birdeyeApiKey ? 'YES' : 'NO'}`);
             
-            // Start the update loop
+            // Start the update loop (5 seconds for faster live data)
             this.intervalId = setInterval(async () => {
+                logger.info('⏰ Marketcap update cycle triggered');
                 await this.updateAllTokens();
-            }, 30000); // 30 seconds
+            }, 5000); // 5 seconds for faster live marketcap data
 
             this.isRunning = true;
-            logger.info('Marketcap updater service started successfully');
+            logger.info('✅ Marketcap updater service started successfully');
             
         } catch (error) {
-            logger.error('Failed to start marketcap updater service:', error);
+            logger.error('❌ Failed to start marketcap updater service:', error);
             throw error;
         }
     }
@@ -65,71 +73,93 @@ export class MarketcapUpdaterService {
 
     private async updateAllTokens(): Promise<void> {
         try {
-            logger.info('Starting marketcap update cycle...');
+            logger.info('🔄 Starting marketcap update cycle...');
             
-            // Get only specific token types: Pump.fun, BONK, BAGS, and Raydium tokens
-            const tokens = await tokenRepository.getAllTokens();
-            const targetTokens = tokens.filter(t => this.isTargetToken(t));
+            // Get all tokens and process them in batches for continuous updates
+            const allTokens = await tokenRepository.getAllTokens();
+            logger.info(`📊 Total tokens in database: ${allTokens.length}`);
             
-            logger.info(`Found ${targetTokens.length} target tokens (Pump.fun, BONK, BAGS, Raydium) for pricing`);
+            const targetTokens = allTokens.filter(t => this.isTargetToken(t));
+            logger.info(`🎯 Target tokens for pricing: ${targetTokens.length}`);
             
-            // Update target tokens with price data
-            if (targetTokens.length > 0) {
-                logger.info(`Updating marketcap for ${targetTokens.length} target tokens`);
-                
-                // Update tokens in parallel with rate limiting
-                const batchSize = 5; // Process 5 tokens at a time to avoid rate limits
-                for (let i = 0; i < targetTokens.length; i += batchSize) {
-                    const batch = targetTokens.slice(i, i + batchSize);
-                    
-                    await Promise.all(
-                        batch.map(token => this.updateTokenMarketcap(token.mint, token.id))
-                    );
-                    
-                    // Small delay between batches to avoid rate limits
-                    if (i + batchSize < targetTokens.length) {
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                }
+            // Process tokens in rotating batches - start from where we left off
+            const batchSize = 15; // Smaller batches for faster processing
+            const startIndex = (this.currentBatchIndex * batchSize) % targetTokens.length;
+            const tokensToProcess = targetTokens.slice(startIndex, startIndex + batchSize);
+            
+            // Update batch index for next cycle
+            this.currentBatchIndex = (this.currentBatchIndex + 1) % Math.ceil(targetTokens.length / batchSize);
+            
+            logger.info(`🚀 Processing batch ${this.currentBatchIndex}: ${tokensToProcess.length} tokens (starting from index ${startIndex})`);
+            
+            // Log some sample tokens
+            if (tokensToProcess.length > 0) {
+                logger.info(`📝 Sample tokens: ${tokensToProcess.slice(0, 3).map(t => t.mint).join(', ')}`);
             }
             
-            logger.info('Marketcap update cycle completed');
+            // Update target tokens with price data using rate-limited queue
+            if (tokensToProcess.length > 0) {
+                logger.info(`🚀 Queuing ${tokensToProcess.length} tokens for marketcap updates (60 RPM limit)`);
+                
+                // Add all tokens to the rate-limited queue
+                tokensToProcess.forEach(token => {
+                    this.requestQueue.push(() => this.updateTokenMarketcap(token.mint, token.id));
+                });
+                
+                // Start processing the queue if not already processing
+                if (!this.isProcessingQueue) {
+                    this.processQueue();
+                }
+            } else {
+                logger.warn('⚠️ No target tokens found for marketcap updates');
+            }
+            
+            logger.info('✅ Marketcap update cycle completed');
             
         } catch (error) {
-            logger.error('Error in marketcap update cycle:', error);
+            logger.error('❌ Error in marketcap update cycle:', error);
         }
     }
 
     private isTargetToken(token: any): boolean {
-        // Check if token is a Pump.fun token (bonding curve)
-        if (token.is_on_curve || token.bonding_curve_address) {
-            return true;
+        // Process ALL tokens immediately - Birdeye API has data for new tokens
+        return true;
+    }
+
+    private async processQueue(): Promise<void> {
+        if (this.isProcessingQueue || this.requestQueue.length === 0) {
+            return;
         }
-        
-        // Check if token is BONK
-        if (token.mint === 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263' || 
-            token.symbol?.toLowerCase() === 'bonk' ||
-            token.name?.toLowerCase().includes('bonk')) {
-            return true;
+
+        this.isProcessingQueue = true;
+        logger.info(`Processing rate-limited queue: ${this.requestQueue.length} requests pending`);
+
+        while (this.requestQueue.length > 0) {
+            const request = this.requestQueue.shift();
+            if (request) {
+                try {
+                    // Ensure we respect the rate limit (1 request per second)
+                    const timeSinceLastRequest = Date.now() - this.lastRequestTime;
+                    if (timeSinceLastRequest < this.RATE_LIMIT_MS) {
+                        const waitTime = this.RATE_LIMIT_MS - timeSinceLastRequest;
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                    }
+
+                    await request();
+                    this.lastRequestTime = Date.now();
+                    
+                    // Log progress every 10 requests
+                    if (this.requestQueue.length % 10 === 0) {
+                        logger.info(`Queue progress: ${this.requestQueue.length} requests remaining`);
+                    }
+                } catch (error) {
+                    logger.error('Error processing rate-limited request:', error);
+                }
+            }
         }
-        
-        // Check if token is BAGS
-        if (token.symbol?.toLowerCase() === 'bags' ||
-            token.name?.toLowerCase().includes('bags')) {
-            return true;
-        }
-        
-        // Check if token is from Raydium (common Raydium token patterns)
-        if (token.mint.includes('raydium') ||
-            token.metadata_uri?.includes('raydium') ||
-            token.name?.toLowerCase().includes('raydium')) {
-            return true;
-        }
-        
-        // Check for other specific token patterns you want to track
-        // Add more conditions here as needed
-        
-        return false;
+
+        this.isProcessingQueue = false;
+        logger.info('Rate-limited queue processing completed');
     }
 
     private async updateTokenMarketcap(contractAddress: string, tokenId: number): Promise<void> {
@@ -137,28 +167,46 @@ export class MarketcapUpdaterService {
             // Try to get market data from multiple sources
             let marketData: MarketData | null = null;
             
-            // Try Jupiter first
-            marketData = await this.getJupiterMarketData(contractAddress);
-            
-            // Fallback to Birdeye if Jupiter fails
-            if (!marketData) {
-                marketData = await this.getBirdeyeMarketData(contractAddress);
-            }
-            
-            // Fallback to DexScreener if both fail
-            if (!marketData) {
-                marketData = await this.getDexScreenerMarketData(contractAddress);
-            }
+            // Use ONLY Birdeye API for marketcap data
+            marketData = await this.getBirdeyeMarketData(contractAddress);
             
             if (marketData) {
+                // Get previous marketcap data for price change detection
+                const previousMarketcap = await marketCapRepository.getLatestMarketCap(tokenId);
+                
                 // Save marketcap data
-                await marketCapRepository.createMarketCap(
-                    tokenId,
-                    marketData.price_usd,
-                    marketData.marketcap,
-                    marketData.volume_24h,
-                    marketData.liquidity
-                );
+                try {
+                    await marketCapRepository.createMarketCap(
+                        tokenId,
+                        marketData.price_usd,
+                        marketData.marketcap,
+                        marketData.volume_24h,
+                        marketData.liquidity
+                    );
+                    logger.info(`✅ Saved marketcap data for ${contractAddress}: $${marketData.marketcap}`);
+                } catch (saveError) {
+                    logger.error(`❌ Failed to save marketcap data for ${contractAddress}:`, saveError);
+                }
+                
+                // Check for significant price changes (>5%)
+                if (previousMarketcap && previousMarketcap.price_usd > 0) {
+                    const priceChangePercent = ((marketData.price_usd - previousMarketcap.price_usd) / previousMarketcap.price_usd) * 100;
+                    
+                    if (Math.abs(priceChangePercent) > 5) {
+                        logger.info(`🚨 SIGNIFICANT PRICE CHANGE: ${contractAddress} ${priceChangePercent > 0 ? '+' : ''}${priceChangePercent.toFixed(2)}% ($${previousMarketcap.price_usd} → $${marketData.price_usd})`);
+                        
+                        // Broadcast significant price change via WebSocket
+                        this.wsService.broadcastPriceAlert({
+                            mint: contractAddress,
+                            previousPrice: previousMarketcap.price_usd,
+                            currentPrice: marketData.price_usd,
+                            changePercent: priceChangePercent,
+                            marketcap: marketData.marketcap,
+                            volume24h: marketData.volume_24h,
+                            timestamp: new Date()
+                        });
+                    }
+                }
                 
                 // Update token status if it has valid liquidity and price
                 if (marketData.liquidity > 1000 && marketData.price_usd > 0) {
@@ -168,6 +216,12 @@ export class MarketcapUpdaterService {
                 
                 // Check for AMM migration (token moving from curve to AMM)
                 await this.checkAMMMigration(contractAddress, tokenId);
+                
+                // Broadcast marketcap update via WebSocket
+                const updatedToken = await tokenRepository.findByMint(contractAddress);
+                if (updatedToken) {
+                    this.wsService.broadcastTokenUpdate(updatedToken);
+                }
                 
                 logger.debug(`Updated marketcap for ${contractAddress}: $${marketData.marketcap.toLocaleString()}`);
             } else {
@@ -179,101 +233,60 @@ export class MarketcapUpdaterService {
         }
     }
 
-    private async getJupiterMarketData(contractAddress: string): Promise<MarketData | null> {
-        try {
-            if (!this.jupiterApiKey) return null;
-            
-            const response = await fetch(`https://price.jup.ag/v4/price?ids=${contractAddress}`, {
-                headers: { 'Authorization': `Bearer ${this.jupiterApiKey}` }
-            });
-            
-            if (!response.ok) return null;
-            
-            const data: any = await response.json();
-            const tokenData = data.data[contractAddress];
-            
-            if (!tokenData) return null;
-            
-            return {
-                price_usd: tokenData.price,
-                marketcap: tokenData.price * (tokenData.supply || 0),
-                volume_24h: tokenData.volume24h || 0,
-                liquidity: tokenData.liquidity || 0
-            };
-            
-        } catch (error: any) {
-            if (error?.cause?.code === "ENOTFOUND") {
-                logger.debug("Jupiter DNS unavailable, skipping this tick");
-                return null;
-            }
-            logger.debug(`Jupiter API failed for ${contractAddress}:`, error);
-            return null;
-        }
-    }
-
     private async getBirdeyeMarketData(contractAddress: string): Promise<MarketData | null> {
         try {
-            if (!this.birdeyeApiKey) return null;
+            if (!this.birdeyeApiKey) {
+                logger.warn('Birdeye API key not configured');
+                return null;
+            }
             
-            const response = await fetch(`https://public-api.birdeye.so/public/price?address=${contractAddress}`, {
-                headers: { 'X-API-KEY': this.birdeyeApiKey }
+            logger.debug(`Fetching Birdeye data for ${contractAddress}`);
+            const response = await fetch(`https://public-api.birdeye.so/defi/price?address=${contractAddress}&ui_amount_mode=raw`, {
+                headers: { 
+                    'X-API-KEY': this.birdeyeApiKey,
+                    'x-chain': 'solana',
+                    'accept': 'application/json'
+                }
             });
             
-            if (!response.ok) return null;
+            if (!response.ok) {
+                logger.warn(`Birdeye API error for ${contractAddress}: ${response.status} ${response.statusText}`);
+                return null;
+            }
             
             const data: any = await response.json();
             
-            if (!data.success || !data.data) return null;
+            if (!data.success || !data.data) {
+                logger.debug(`No Birdeye data for ${contractAddress}: ${JSON.stringify(data)}`);
+                return null;
+            }
             
-            return {
+            // Calculate marketcap using price and total supply
+            // For now, we'll use a default supply of 1 billion tokens
+            // In a real implementation, you'd fetch the actual total supply from the token
+            const defaultSupply = 1000000000; // 1 billion tokens
+            const calculatedMarketcap = data.data.value * defaultSupply;
+            
+            const marketData = {
                 price_usd: data.data.value,
-                marketcap: data.data.marketCap || 0,
-                volume_24h: data.data.volume24h || 0,
+                marketcap: calculatedMarketcap,
+                volume_24h: 0, // Birdeye price endpoint doesn't provide volume directly
                 liquidity: data.data.liquidity || 0
             };
+            
+            logger.debug(`Birdeye data for ${contractAddress}: $${marketData.price_usd}, MC: $${marketData.marketcap}`);
+            return marketData;
             
         } catch (error: any) {
             if (error?.cause?.code === "ENOTFOUND") {
                 logger.debug("Birdeye DNS unavailable, skipping this tick");
                 return null;
             }
-            logger.debug(`Birdeye API failed for ${contractAddress}:`, error);
+            logger.error(`Birdeye API failed for ${contractAddress}:`, error);
             return null;
         }
     }
 
-    private async getDexScreenerMarketData(contractAddress: string): Promise<MarketData | null> {
-        try {
-            const response = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${contractAddress}`);
-            
-            if (!response.ok) return null;
-            
-            const data: any = await response.json();
-            const pairs = data.pairs;
-            
-            if (!pairs || pairs.length === 0) return null;
-            
-            // Get the first pair with the highest liquidity
-            const bestPair = pairs.reduce((best: any, current: any) => {
-                return (current.liquidity?.usd || 0) > (best.liquidity?.usd || 0) ? current : best;
-            });
-            
-            return {
-                price_usd: parseFloat(bestPair.priceUsd) || 0,
-                marketcap: parseFloat(bestPair.marketCap) || 0,
-                volume_24h: parseFloat(bestPair.volume?.h24) || 0,
-                liquidity: parseFloat(bestPair.liquidity?.usd) || 0
-            };
-            
-        } catch (error: any) {
-            if (error?.cause?.code === "ENOTFOUND") {
-                logger.debug("DexScreener DNS unavailable, skipping this tick");
-                return null;
-            }
-            logger.debug(`DexScreener API failed for ${contractAddress}:`, error);
-            return null;
-        }
-    }
 
     private async checkAMMMigration(contractAddress: string, tokenId: number): Promise<void> {
         try {

@@ -155,11 +155,20 @@ export class TokenRepository {
         return result.rows;
     }
 
-    async findTokensByStatus(status: string, limit: number = 100, offset: number = 0): Promise<Token[]> {
+    async findTokensByStatus(status: string, limit: number = 100, offset: number = 0): Promise<TokenWithMarketCap[]> {
         const query = `
-            SELECT * FROM tokens 
-            WHERE status = $1 
-            ORDER BY COALESCE(blocktime, created_at) DESC 
+            SELECT t.*, 
+                COALESCE(t.name, t.symbol, SUBSTRING(t.mint,1,4) || '…' || SUBSTRING(t.mint FROM LENGTH(t.mint)-3)) AS display_name,
+                m.price_usd, m.marketcap, m.volume_24h, m.liquidity
+            FROM tokens t
+            LEFT JOIN LATERAL (
+                SELECT * FROM marketcaps 
+                WHERE token_id = t.id 
+                ORDER BY timestamp DESC 
+                LIMIT 1
+            ) m ON true
+            WHERE t.status = $1 
+            ORDER BY COALESCE(t.blocktime, t.created_at) DESC 
             LIMIT $2 OFFSET $3
         `;
         const result = await db.query(query, [status, limit, offset]);
@@ -387,6 +396,11 @@ export class MarketCapRepository {
         `;
         const result = await db.query(query, [tokenId]);
         return result.rows[0] || null;
+    }
+
+    async getLatestMarketCap(tokenId: number): Promise<MarketCap | null> {
+        // Alias for findLatestByTokenId for consistency
+        return this.findLatestByTokenId(tokenId);
     }
 
     async findHistoryByTokenId(tokenId: number, limit: number = 100): Promise<MarketCap[]> {

@@ -1,9 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 
 interface WebSocketMessage {
-  type: 'connected' | 'new_token' | 'token_update';
+  type: 'connected' | 'new_token' | 'token_update' | 'price_alert';
   data?: any;
   message?: string;
+}
+
+interface PriceAlert {
+  mint: string;
+  previousPrice: number;
+  currentPrice: number;
+  changePercent: number;
+  marketcap: number;
+  volume24h: number;
+  timestamp: Date;
 }
 
 export const useWebSocket = (url: string) => {
@@ -37,6 +47,8 @@ export const useWebSocket = (url: string) => {
               console.log('New token received:', message.data);
             } else if (message.type === 'token_update') {
               console.log('Token update received:', message.data);
+            } else if (message.type === 'price_alert') {
+              console.log('🚨 PRICE ALERT:', message.data);
             }
           } catch (error) {
             console.error('Error parsing WebSocket message:', error);

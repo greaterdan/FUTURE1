@@ -44,7 +44,7 @@ export default function NavigationHub({ isOpen, onClose }: NavigationHubProps) {
       
       {/* Navigation Hub */}
       <div 
-        className={`fixed left-0 top-0 h-full w-1/2 bg-black/90 border-r border-white/20 z-[50] transition-transform duration-500 ease-out flex flex-col ${
+        className={`navigation-hub fixed left-0 top-0 h-full w-1/2 bg-black/90 border-r border-white/20 z-[50] transition-transform duration-500 ease-out flex flex-col ${
           animateIn ? 'translate-x-0' : '-translate-x-full'
         } ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}
         style={{

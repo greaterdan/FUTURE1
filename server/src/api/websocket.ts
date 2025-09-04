@@ -89,4 +89,29 @@ export class WebSocketService {
     public getConnectedClients(): number {
         return this.clients.size;
     }
+
+    // Broadcast price alert to all connected clients
+    public broadcastPriceAlert(priceAlert: any) {
+        const message = JSON.stringify({
+            type: 'price_alert',
+            data: priceAlert
+        });
+
+        let successCount = 0;
+        this.clients.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+                try {
+                    client.send(message);
+                    successCount++;
+                } catch (error) {
+                    logger.error('Error sending price alert:', error);
+                    this.clients.delete(client);
+                }
+            } else {
+                this.clients.delete(client);
+            }
+        });
+
+        logger.debug(`Broadcasted price alert to ${successCount}/${this.clients.size} clients: ${priceAlert.mint}`);
+    }
 }

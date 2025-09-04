@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import { Connection } from '@solana/web3.js';
-import { server } from './app';
+import { server, wsService } from './app';
 import { MintWatcherService } from './services/mintWatcher';
 import { MarketcapUpdaterService } from './services/marketcapUpdater';
 import { MetadataEnricherService } from './services/metadataEnricherService';
@@ -18,7 +18,6 @@ const PORT = process.env.PORT || 8080;
 
 // Get required environment variables
 const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL;
-const JUPITER_API_KEY = process.env.JUPITER_API_KEY || '';
 const BIRDEYE_API_KEY = process.env.BIRDEYE_API_KEY || '';
 
 if (!HELIUS_RPC_URL) {
@@ -26,10 +25,15 @@ if (!HELIUS_RPC_URL) {
     process.exit(1);
 }
 
+if (!BIRDEYE_API_KEY) {
+    logger.error('BIRDEYE_API_KEY environment variable is required');
+    process.exit(1);
+}
+
 // Initialize services
 const connection = new Connection(HELIUS_RPC_URL, 'confirmed');
 const mintWatcher = new MintWatcherService(HELIUS_RPC_URL);
-const marketcapUpdater = new MarketcapUpdaterService(JUPITER_API_KEY, BIRDEYE_API_KEY);
+const marketcapUpdater = new MarketcapUpdaterService(BIRDEYE_API_KEY, wsService);
 const metadataEnricher = new MetadataEnricherService(connection, tokenRepository);
 const tokenStatusUpdater = new TokenStatusUpdaterService();
 const holderIndexer = new HolderIndexer(connection, tokenRepository);
@@ -117,7 +121,7 @@ const startServer = async () => {
         
         // Start marketcap updater service
         await marketcapUpdater.start();
-        logger.info('✅ Marketcap Updater: Price updates every 30 seconds');
+        logger.info('✅ Marketcap Updater: Rate-limited updates (60 RPM) every 10 seconds');
         
         // Start metadata enricher service
         await metadataEnricher.start();
@@ -133,7 +137,7 @@ const startServer = async () => {
         
         logger.info('🚀 Solana Mint Discovery System started successfully!');
         logger.info('🔍 Watching for new token mints via Helius WebSocket');
-        logger.info('💰 Tracking marketcap from Jupiter, Birdeye, and DexScreener');
+        logger.info('💰 Tracking marketcap from Birdeye API (60 RPM rate limit, 10s updates)');
         logger.info('📊 Tokens progress: fresh → curve → active (when migrating to AMM)');
 
                 // Check if port is already in use and free it

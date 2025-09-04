@@ -14,6 +14,8 @@ const BottomNavigation = dynamic(() => import("@/components/BottomNavigation"), 
 const BirthdayEntry = dynamic(() => import("@/components/BirthdayEntry"), { ssr: false });
 const ZodiacDisplay = dynamic(() => import("@/components/ZodiacDisplay"), { ssr: false });
 const Scope = dynamic(() => import("@/components/Scope"), { ssr: false });
+const NavigationHub = dynamic(() => import("@/components/NavigationHub"), { ssr: false });
+const OracleHub = dynamic(() => import("@/components/OracleHub"), { ssr: false });
 const RetroGeometry = dynamic(() => import("@/components/RetroGeometry"), { ssr: false });
 const CornerLogo = dynamic(() => import("@/components/CornerLogo"), { ssr: false });
 
@@ -188,6 +190,17 @@ export default function Page() {
         />
         <BottomNavigation isNavigationHubOpen={isNavigationHubOpen} isOracleHubOpen={isOracleHubOpen} isScopeOpen={isScopeOpen} />
         
+        {/* NAVIGATION HUB component - overlays on top of background */}
+        <AnimatePresence mode="wait">
+          {isNavigationHubOpen && (
+            <NavigationHub 
+              key="navigation"
+              isOpen={isNavigationHubOpen}
+              onClose={() => saveNavigationState(false)}
+            />
+          )}
+        </AnimatePresence>
+
         {/* SCOPE component - now overlays on top of background */}
         <AnimatePresence mode="wait">
           {isScopeOpen && (
@@ -204,6 +217,17 @@ export default function Page() {
               pauseLive={pauseLive}
               newTokenMint={newTokenMint}
               onClose={() => saveScopeState(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* ORACLE HUB component - overlays on top of background */}
+        <AnimatePresence mode="wait">
+          {isOracleHubOpen && (
+            <OracleHub 
+              key="oracle"
+              isOpen={isOracleHubOpen}
+              onClose={() => saveOracleState(false)}
             />
           )}
         </AnimatePresence>

@@ -9,6 +9,17 @@ import HoverImagePreview from './HoverImagePreview';
 import CreationTimeDisplay from './CreationTimeDisplay';
 import TokenSearch from './TokenSearch';
 
+// Format marketcap with K/M suffixes
+const formatMarketcap = (value: number): string => {
+  if (value >= 1000000) {
+    return (value / 1000000).toFixed(1).replace('.0', '') + 'M';
+  } else if (value >= 1000) {
+    return (value / 1000).toFixed(1).replace('.0', '') + 'K';
+  } else {
+    return value.toFixed(0);
+  }
+};
+
 // Typing Indicator Component
 const TypingIndicator: React.FC<{ isTyping: boolean; companionName?: string }> = ({ isTyping, companionName }) => {
   if (!isTyping) return null;
@@ -255,20 +266,28 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
         <div className="min-w-0">
           <span className="text-white/60">MC:</span>
-          <span className="text-white ml-1 font-mono truncate">
-            {token.is_on_curve ? '— (on curve)' : (token.marketcap ? `$${token.marketcap.toLocaleString()}` : '—')}
+          <span className={`ml-1 font-mono truncate font-semibold ${
+            token.is_on_curve 
+              ? 'text-white' 
+              : (token.marketcap && token.marketcap !== 'null' && token.marketcap !== '0' 
+                  ? (parseFloat(token.marketcap) > 30000 
+                      ? 'text-yellow-400' 
+                      : 'text-green-400')
+                  : 'text-white')
+          }`}>
+            {token.is_on_curve ? '— (on curve)' : (token.marketcap && token.marketcap !== 'null' && token.marketcap !== '0' ? `$${formatMarketcap(parseFloat(token.marketcap))}` : '—')}
           </span>
         </div>
         <div className="min-w-0">
           <span className="text-white/60">Price:</span>
           <span className="text-white ml-1 font-mono truncate">
-            {token.is_on_curve ? '— (on curve)' : (token.price_usd ? `$${token.price_usd.toFixed(8)}` : '—')}
+            {token.is_on_curve ? '— (on curve)' : (token.price_usd && token.price_usd !== 'null' && token.price_usd !== '0' ? `$${parseFloat(token.price_usd).toFixed(8)}` : '—')}
           </span>
         </div>
         <div className="min-w-0">
           <span className="text-white/60">Vol:</span>
           <span className="text-white ml-1 font-mono truncate">
-            {token.is_on_curve ? '— (on curve)' : (token.volume_24h ? `$${Math.round(token.volume_24h).toLocaleString()}` : '—')}
+            {token.is_on_curve ? '— (on curve)' : (token.volume_24h && token.volume_24h !== 'null' && token.volume_24h !== '0' ? `$${Math.round(parseFloat(token.volume_24h)).toLocaleString()}` : '—')}
           </span>
         </div>
       </div>
@@ -333,10 +352,10 @@ function TokenColumn({
 }) {
 
   return (
-    <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 cursor-default ${className}`}>
+    <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 ${className}`}>
       <h2 className="text-white text-lg font-bold text-center flex-shrink-0">{title}</h2>
       <div className="w-full border-b border-gray-700 mb-3 -mx-3" />
-      <div className="rounded-2xl bg-black/15 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6 cursor-default">
+      <div className="rounded-2xl bg-black/15 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6">
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="text-center text-white/40 py-8">
@@ -672,7 +691,15 @@ export const Scope = ({
     // Use transformed property names from useServerData and limit to 30 tokens each
     const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve).slice(0, 30);
     const filled = tokensToFilter.filter(t => t && t.status === 'active').slice(0, 30);
-    const onEdge = tokensToFilter.filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.liquidity && t.liquidity > 0).slice(0, 30);
+    // EDGE: Fresh tokens sorted by marketcap (highest to lowest, up to 84K)
+    const onEdge = tokensToFilter
+      .filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.marketcap && t.marketcap !== 'null' && t.marketcap !== '0')
+      .filter(t => {
+        const marketcapValue = parseFloat(t.marketcap);
+        return marketcapValue > 0 && marketcapValue <= 84000; // Up to 84K
+      })
+      .sort((a, b) => parseFloat(b.marketcap) - parseFloat(a.marketcap)) // Sort by marketcap descending
+      .slice(0, 30);
     const curveTokens = tokensToFilter.filter(t => t && (t.status === 'curve' || t.isOnCurve)).slice(0, 30);
     
     console.log("✅ Filtered tokens:", {
@@ -853,7 +880,7 @@ export const Scope = ({
 
   return (
     <motion.div 
-      className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col scope-container cursor-default"
+      className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col scope-container"
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
@@ -861,7 +888,6 @@ export const Scope = ({
         duration: 0.4, 
         ease: [0.25, 0.46, 0.45, 0.94]
       }}
-      style={{ cursor: 'default' }}
     >
       {/* Header */}
       <motion.div 
@@ -916,13 +942,13 @@ export const Scope = ({
                )}
              </motion.div>
              
-             {/* Chat Button - Between Search and Close */}
+             {/* Robot Button - Between Search and Close */}
              <motion.button
                onClick={() => setIsChatOpen(!isChatOpen)}
                className={`p-2 rounded-full transition-all duration-300 ${
                  isChatOpen 
-                   ? 'bg-gradient-to-r from-purple-500 to-pink-500 shadow-lg shadow-purple-500/30' 
-                   : 'bg-white/10 hover:bg-white/20 border border-white/20'
+                   ? 'bg-gradient-to-r from-gray-800 to-black shadow-lg shadow-black/50 border border-gray-600' 
+                   : 'bg-black/20 hover:bg-black/40 border border-gray-700 shadow-md shadow-black/30'
                }`}
                initial={{ y: -10, opacity: 0 }}
                animate={{ y: 0, opacity: 1 }}
@@ -930,8 +956,8 @@ export const Scope = ({
                whileHover={{ scale: 1.1 }}
                whileTap={{ scale: 0.95 }}
              >
-               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+               <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                 <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 6.5V7.5C15 8.3 14.3 9 13.5 9H10.5C9.7 9 9 8.3 9 7.5V6.5L3 7V9L9 8.5V9.5C9 10.3 9.7 11 10.5 11H13.5C14.3 11 15 10.3 15 9.5V8.5L21 9ZM7.5 12C6.7 12 6 12.7 6 13.5V16.5C6 17.3 6.7 18 7.5 18S9 17.3 9 16.5V13.5C9 12.7 8.3 12 7.5 12ZM16.5 12C15.7 12 15 12.7 15 13.5V16.5C15 17.3 15.7 18 16.5 18S18 17.3 18 16.5V13.5C18 12.7 17.3 12 16.5 12ZM12 13.5C11.2 13.5 10.5 14.2 10.5 15V17C10.5 17.8 11.2 18.5 12 18.5S13.5 17.8 13.5 17V15C13.5 14.2 12.8 13.5 12 13.5Z"/>
                </svg>
              </motion.button>
            </div>
@@ -964,11 +990,10 @@ export const Scope = ({
 
       {/* Main Content */}
       <motion.div 
-        className="p-6 flex-1 overflow-hidden relative h-full cursor-default"
+        className="p-6 flex-1 overflow-hidden relative h-full"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-        style={{ cursor: 'default' }}
       >
         {isLoading ? (
           <div className="flex items-center justify-center py-20">

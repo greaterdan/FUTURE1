@@ -46,9 +46,9 @@ export interface TransformedTokenData {
   metadataUri?: string;
   isOnCurve: boolean;
   bondingCurveAddress?: string;
-  marketCap?: number;
-  price?: number;
-  volume24h?: number;
+  marketcap?: number;
+  price_usd?: number;
+  volume_24h?: number;
   liquidity?: number;
   links: {
     dexscreener: string;
@@ -88,9 +88,9 @@ const transformTokenData = (serverToken: ServerTokenData): TransformedTokenData 
     metadataUri: serverToken.metadata_uri,
     isOnCurve: serverToken.is_on_curve,
     bondingCurveAddress: serverToken.bonding_curve_address,
-    marketCap: serverToken.marketcap, // Fixed: use direct property
-    price: serverToken.price_usd, // Fixed: use direct property
-    volume24h: serverToken.volume_24h, // Fixed: use direct property
+    marketcap: serverToken.marketcap, // Fixed: match UI component expectations
+    price_usd: serverToken.price_usd, // Fixed: match UI component expectations
+    volume_24h: serverToken.volume_24h, // Fixed: match UI component expectations
     liquidity: serverToken.liquidity, // Fixed: use direct property
     links: {
       dexscreener: `https://dexscreener.com/solana/${serverToken.mint}`,
@@ -271,6 +271,31 @@ export const useServerData = (isOpen: boolean) => {
         ));
         setLastUpdate(new Date());
         console.log('🔄 TOKEN UPDATED VIA WEBSOCKET:', updatedToken.name || updatedToken.symbol || updatedToken.mint);
+      } else if (lastMessage.type === 'price_alert') {
+        // Handle significant price changes
+        const priceAlert = lastMessage.data;
+        console.log(`🚨 PRICE ALERT: ${priceAlert.mint} ${priceAlert.changePercent > 0 ? '+' : ''}${priceAlert.changePercent.toFixed(2)}% ($${priceAlert.previousPrice} → $${priceAlert.currentPrice})`);
+        
+        // Update the token in the list with new price data
+        setTokens(prev => prev.map(token => {
+          if (token.mint === priceAlert.mint) {
+            return {
+              ...token,
+              price_usd: priceAlert.currentPrice,
+              marketcap: priceAlert.marketcap,
+              volume_24h: priceAlert.volume24h,
+              // Add price change info for UI highlighting
+              priceChange: {
+                percent: priceAlert.changePercent,
+                previous: priceAlert.previousPrice,
+                current: priceAlert.currentPrice,
+                timestamp: new Date(priceAlert.timestamp)
+              }
+            };
+          }
+          return token;
+        }));
+        setLastUpdate(new Date());
       }
     }
   }, [lastMessage]);
