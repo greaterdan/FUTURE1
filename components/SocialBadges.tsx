@@ -96,9 +96,6 @@ export default function SocialBadges({ links, website, twitter, telegram, source
       )}
       
       {/* Trading Links */}
-      <A href={links?.dexscreener} title="DexScreener">
-        <BarChart3 size={14} className="text-white/80" />
-      </A>
       <A href={links?.jupiter} title="Trade on Jupiter">
         <ExternalLink size={14} className="text-white/80" />
       </A>
