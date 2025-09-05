@@ -262,6 +262,12 @@ export class MetadataEnricherService {
         }
       }
       
+      // Also check if the mint address ends with 'pump' (pump.fun tokens)
+      if (!result.source && metadata.name) {
+        // This is a fallback - if we can't determine from createdOn, we'll let the frontend handle it
+        // based on the mint address pattern
+      }
+      
       return result;
     } catch (error) {
       logger.debug(`Failed to extract social links from ${metadataUri}:`, error);

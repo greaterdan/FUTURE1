@@ -44,26 +44,28 @@ const A: React.FC<{href?: string; title: string; children: React.ReactNode}> = (
 export default function SocialBadges({ links, website, twitter, telegram, source }: Props) {
   // Helper function to get source platform URL
   const getSourceUrl = (source: string, mint: string) => {
-    switch (source) {
-      case 'pump.fun':
-        return `https://pump.fun/coin/${mint}`;
-      case 'bonk.fun':
-        return `https://bonk.fun/token/${mint}`;
-      default:
-        return null;
+    // Check if it's a pump.fun token (mint ends with 'pump' or source is pump.fun)
+    if (source === 'pump.fun' || mint.endsWith('pump')) {
+      return `https://pump.fun/coin/${mint}`;
     }
+    // Check if it's a bonk.fun token
+    if (source === 'bonk.fun' || mint.endsWith('bonk')) {
+      return `https://bonk.fun/token/${mint}`;
+    }
+    return null;
   };
 
   // Helper function to get source platform icon
-  const getSourceIcon = (source: string) => {
-    switch (source) {
-      case 'pump.fun':
-        return <Flame size={14} className="text-orange-400" />;
-      case 'bonk.fun':
-        return <Gamepad2 size={14} className="text-yellow-400" />;
-      default:
-        return <ExternalLink size={14} className="text-white/80" />;
+  const getSourceIcon = (source: string, mint: string) => {
+    // Check if it's a pump.fun token (mint ends with 'pump' or source is pump.fun)
+    if (source === 'pump.fun' || mint.endsWith('pump')) {
+      return <Flame size={14} className="text-orange-400" />;
     }
+    // Check if it's a bonk.fun token
+    if (source === 'bonk.fun' || mint.endsWith('bonk')) {
+      return <Gamepad2 size={14} className="text-yellow-400" />;
+    }
+    return <ExternalLink size={14} className="text-white/80" />;
   };
 
   // Get mint from links (we'll need to pass this from the parent component)
@@ -89,15 +91,15 @@ export default function SocialBadges({ links, website, twitter, telegram, source
       )}
       
       {/* Source Platform */}
-      {source && (
-        <A href={getSourceUrl(source, mint)} title={`View on ${source}`}>
-          {getSourceIcon(source)}
+      {(source || mint.endsWith('pump') || mint.endsWith('bonk')) && (
+        <A href={getSourceUrl(source, mint)} title={`View on ${source || (mint.endsWith('pump') ? 'pump.fun' : 'bonk.fun')}`}>
+          {getSourceIcon(source, mint)}
         </A>
       )}
       
       {/* Trading Links */}
-      <A href={links?.jupiter} title="Trade on Jupiter">
-        <ExternalLink size={14} className="text-white/80" />
+      <A href={links?.explorer} title="Solscan">
+        <Landmark size={14} className="text-white/80" />
       </A>
     </div>
   );
