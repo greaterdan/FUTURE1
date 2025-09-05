@@ -67,4 +67,4 @@ jspm_packages/
 
 # dotenv environment variables file
 .env
-public/
+# public/ - commented out to allow public folder in repository
