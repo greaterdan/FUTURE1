@@ -36,6 +36,41 @@
   display: none;  /* Safari and Chrome */
 }
 
+/* Companion video transparent background */
+.companion-video {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Force transparent background on companion orbs */
+.companion-video,
+.companion-video *,
+div[class*="companion"],
+div[class*="w-20 h-20 rounded-full"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* Remove black backgrounds from WIZZARD videos */
+video[src*="WIZZARD"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  mix-blend-mode: screen !important;
+  filter: brightness(1.5) contrast(1.2) !important;
+}
+
+/* Alternative approach - use CSS mask to hide black areas */
+video[src*="The Analyzer"],
+video[src*="The Predictor"], 
+video[src*="The Quantum Eraser"],
+video[src*="The Retrocasual"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  mix-blend-mode: screen !important;
+  filter: brightness(2) contrast(1.5) saturate(1.2) !important;
+}
+
 @font-face {
   font-family: 'VT323';
   src: url('/VT323-Regular.ttf') format('truetype');

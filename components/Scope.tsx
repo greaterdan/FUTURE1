@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { createPortal } from 'react-dom';
 
 
 import ImageWithFallback from './ImageWithFallback';
@@ -469,13 +470,13 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
   const [isDragOver, setIsDragOver] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
   const [ripplePosition, setRipplePosition] = useState<{ x: number; y: number } | null>(null);
-  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
-      if (dragTimeoutRef.current) {
-        clearTimeout(dragTimeoutRef.current);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
       }
     };
   }, []);
@@ -510,44 +511,6 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     onFocusToken?.(token);
   };
 
-  const handleDragEnter = (e: React.DragEvent) => {
-    e.preventDefault();
-    console.log('Drag enter token:', token.mint, 'Attached companion:', attachedCompanion, 'Dragged agent:', draggedAgent);
-    
-    setIsDragOver(true);
-    onDragTargetChange?.(token);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    // Keep the drag over state active while dragging over the card
-    if (!isDragOver) {
-      setIsDragOver(true);
-      onDragTargetChange?.(token);
-    }
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    
-    // Clear any existing timeout
-    if (dragTimeoutRef.current) {
-      clearTimeout(dragTimeoutRef.current);
-    }
-    
-    // Debounce the drag leave to prevent flickering
-    dragTimeoutRef.current = setTimeout(() => {
-      // Only set drag over to false if we're actually leaving the card
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX;
-      const y = e.clientY;
-      
-      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
-        setIsDragOver(false);
-        onDragTargetChange?.(null);
-      }
-    }, 50);
-  };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -589,9 +552,27 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           : 'border-white/10 bg-white/6'
       }`}
       style={{ willChange: 'transform', pointerEvents: 'auto' }}
-      onDragEnter={handleDragEnter}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!isDragOver) {
+          setIsDragOver(true);
+          onDragTargetChange?.(token);
+        }
+      }}
+      onDragLeave={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Only clear if we're actually leaving the card, not just moving to a child element
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX;
+        const y = e.clientY;
+        
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+          setIsDragOver(false);
+          onDragTargetChange?.(null);
+        }
+      }}
       onDrop={handleDrop}
       onMouseEnter={onHoverEnter}
       onMouseLeave={onHoverLeave}
@@ -1362,12 +1343,21 @@ export const Scope = ({
   // AI Agents state
   const [hoveredAgent, setHoveredAgent] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Drag preview state
   const [dragTargetToken, setDragTargetToken] = useState<any>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedAgent, setDraggedAgent] = useState<string | null>(null);
   
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Load conversations from localStorage on component mount
   useEffect(() => {
@@ -1775,7 +1765,7 @@ export const Scope = ({
 
   return (
     <motion.div 
-      className="fixed inset-0 bg-black/95 z-50 overflow-hidden flex flex-col scope-container"
+      className="fixed inset-0 bg-black/95 z-50 overflow-visible flex flex-col scope-container"
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.98 }}
@@ -1872,7 +1862,7 @@ export const Scope = ({
 
       {/* Main Content */}
       <motion.div 
-        className="p-6 flex-1 overflow-hidden relative h-full"
+        className="p-6 flex-1 overflow-visible relative h-full"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -1978,7 +1968,7 @@ export const Scope = ({
                   focusToken={focusToken}
                   className="border-r border-neutral-800/60 flex-1 min-w-0"
                 />
-                <div className="flex flex-col flex-1 min-w-0 relative h-[calc(100vh-200px)]">
+                <div className="flex flex-col flex-1 min-w-0 relative h-[calc(100vh-200px)] overflow-visible">
                 {/* Drag Target Preview */}
                 {dragTargetToken && (
                   <motion.div
@@ -2101,9 +2091,27 @@ export const Scope = ({
                   );
                 })()}
                 
+                
+                
+                {/* Debug Hover State */}
+                {hoveredAgent && (
+                  <div className="fixed top-4 left-4 bg-red-500 text-white p-2 rounded z-99999">
+                    HOVERING: {hoveredAgent.name}
+                  </div>
+                )}
+
                 {/* Companion orbs section - positioned under COMPANIONS header */}
-                <div className="flex justify-center py-4 relative z-10 pointer-events-auto">
-                  <div className="flex gap-4">
+                <div 
+                  className="flex flex-col items-center py-4 relative z-10 pointer-events-auto overflow-visible"
+                  onMouseLeave={() => setHoveredAgent(null)}
+                  onDragEnd={() => {
+                    // Clear all drag states when drag ends anywhere
+                    setIsDragging(false);
+                    setDraggedAgent(null);
+                    setDragTargetToken(null);
+                  }}
+                >
+                  <div className="flex gap-4 overflow-visible">
                     {agents.filter(agent => {
                       // Only show companions that are NOT currently attached
                       return !attachedCompanion || attachedCompanion.name !== agent.name;
@@ -2111,26 +2119,57 @@ export const Scope = ({
                       <div
                         key={agent.name}
                         draggable={true}
-                        className={`relative w-20 h-20 rounded-full cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110 ${
+                        className={`relative w-20 h-20 rounded-full cursor-grab active:cursor-grabbing overflow-visible transition-all duration-300 hover:scale-110 ${
                           draggedAgent === agent.name ? 'opacity-0 pointer-events-none' : 'opacity-100'
                         }`}
                         style={{ 
                           background: 'transparent',
+                          backgroundColor: 'transparent',
                           pointerEvents: 'auto',
-                          zIndex: 1000
+                          zIndex: 1000,
+                          border: 'none',
+                          outline: 'none'
                         }}
-                        onMouseEnter={() => setHoveredAgent(agent)}
-                        onMouseLeave={() => setHoveredAgent(null)}
+                        onMouseEnter={(e) => {
+                          e.stopPropagation();
+                          console.log('Mouse enter agent:', agent.name);
+                          // Clear any pending timeout
+                          if (hoverTimeoutRef.current) {
+                            clearTimeout(hoverTimeoutRef.current);
+                            hoverTimeoutRef.current = null;
+                          }
+                          setHoveredAgent(agent);
+                        }}
+                        onMouseLeave={(e) => {
+                          e.stopPropagation();
+                          console.log('Mouse leave agent:', agent.name);
+                          // Clear any existing timeout
+                          if (hoverTimeoutRef.current) {
+                            clearTimeout(hoverTimeoutRef.current);
+                            hoverTimeoutRef.current = null;
+                          }
+                          // Remove hover immediately - no delay
+                          setHoveredAgent(null);
+                        }}
+                        onMouseMove={(e) => {
+                          e.stopPropagation();
+                          // Clear any pending timeout when moving within the orb
+                          if (hoverTimeoutRef.current) {
+                            clearTimeout(hoverTimeoutRef.current);
+                            hoverTimeoutRef.current = null;
+                          }
+                          // Ensure hover state is maintained while moving within the orb
+                          if (hoveredAgent?.name !== agent.name) {
+                            setHoveredAgent(agent);
+                          }
+                        }}
                         onDragStart={(e) => {
-                          console.log('DRAG START:', agent.name);
                           e.dataTransfer.setData('text/plain', agent.name);
                           e.dataTransfer.effectAllowed = 'copy';
                           setIsDragging(true);
                           setDraggedAgent(agent.name);
-                          console.log('Set draggedAgent to:', agent.name);
                         }}
                         onDragEnd={(e) => {
-                          console.log('DRAG END:', agent.name);
                           // Reset the drag state immediately
                           setIsDragging(false);
                           setDraggedAgent(null);
@@ -2140,6 +2179,7 @@ export const Scope = ({
                       >
                         <video 
                           className="w-full h-full object-cover pointer-events-none companion-video"
+                          preload="auto"
                           autoPlay 
                           muted 
                           loop
@@ -2147,23 +2187,75 @@ export const Scope = ({
                           draggable={false}
                           style={{ 
                             mixBlendMode: 'screen',
-                            filter: 'brightness(1.2) contrast(1.1)',
+                            filter: 'brightness(2) contrast(1.5) saturate(1.2)',
                             background: 'transparent',
                             backgroundColor: 'transparent',
                             backgroundImage: 'none',
                             backgroundClip: 'content-box',
-                            isolation: 'isolate'
+                            isolation: 'isolate',
+                            border: 'none',
+                            outline: 'none'
                           }}
                         >
                           <source src={agent.videoFile} type="video/webm" />
                         </video>
+                        
                       </div>
                     ))}
                   </div>
+                  
+                  {/* HOVER CARD - ABSOLUTE POSITIONED UNDER WEBM ORBS */}
+                  {hoveredAgent && (
+                    <div
+                      className="absolute w-80 rounded-xl p-4"
+                      style={{ 
+                        zIndex: 99999,
+                        background: 'rgba(0, 0, 0, 0.85)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                        backdropFilter: 'blur(10px)',
+                        top: '120px',
+                        left: '50%',
+                        transform: 'translateX(-50%)'
+                      }}
+                    >
+                      <div className="space-y-3">
+                        {/* Title with icon */}
+                        <div className="flex items-center space-x-3">
+                          <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
+                            <video 
+                              className="w-full h-full object-cover"
+                              autoPlay 
+                              muted 
+                              loop
+                              playsInline
+                              style={{ 
+                                mixBlendMode: 'screen',
+                                filter: 'brightness(1.2) contrast(1.1)',
+                                background: 'transparent'
+                              }}
+                            >
+                              <source src={hoveredAgent.videoFile} type="video/webm" />
+                            </video>
+                          </div>
+                          <h3 className="text-white text-lg font-bold">{hoveredAgent.name}</h3>
+                        </div>
+                        
+                        {/* Description */}
+                        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                          <p className="text-gray-200 text-sm leading-relaxed">
+                            {hoveredAgent.description}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                 </div>
 
+
                 {/* Main content area with proper height calculation */}
-                <div className="flex-1 flex flex-col min-h-0 max-h-full overflow-hidden relative z-0">
+                <div className="flex-1 flex flex-col min-h-0 max-h-full overflow-visible relative z-0">
                   {/* Messages display area - proper chat layout */}
                   <div 
                     ref={messagesContainerRef}
@@ -2174,7 +2266,7 @@ export const Scope = ({
                       msOverflowStyle: 'none'
                     }}
                   >
-                    <div className="flex flex-col justify-end min-h-full p-4 pb-2 relative">
+                    <div className="flex flex-col min-h-full p-4 pb-2 relative">
                       {messages.length === 0 && !isDragging && !draggedAgent ? (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                           <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
@@ -2182,6 +2274,7 @@ export const Scope = ({
                           </div>
                         </div>
                       ) : (
+                        <div className="flex flex-col justify-end h-full">
                         <div className="space-y-2">
                           {messages.map((message, index) => (
                             <motion.div
@@ -2229,6 +2322,7 @@ export const Scope = ({
                               </div>
                             </motion.div>
                           )}
+                        </div>
                         </div>
                       )}
                       
