@@ -26,8 +26,8 @@ export class TokenStatusUpdaterService {
 
         logger.info('Starting Token Status Updater Service...');
         
-        // Update token statuses every 10 seconds
-        this.cronJob = cron.schedule("*/10 * * * * *", async () => {
+        // Update token statuses every 30 seconds to avoid rate limits
+        this.cronJob = cron.schedule("*/30 * * * * *", async () => {
             try {
                 await this.updateTokenStatuses();
             } catch (error) {

@@ -267,6 +267,39 @@ video {
   background-image: none !important;
 }
 
+/* Special handling for all companions to ensure transparency */
+video[src*="The Analyzer"],
+img[src*="The Analyzer"],
+video[src*="The Predictor"],
+img[src*="The Predictor"],
+video[src*="The Quantum Eraser"],
+img[src*="The Quantum Eraser"],
+video[src*="The Retrocasual"],
+img[src*="The Retrocasual"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  mix-blend-mode: screen !important;
+  filter: brightness(1.2) contrast(1.1) !important;
+  background-clip: padding-box !important;
+  -webkit-background-clip: padding-box !important;
+}
+
+/* Force all companion videos to use screen blend mode */
+.companion-video video,
+.companion-video img {
+  mix-blend-mode: screen !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Ensure GIF files have transparent backgrounds */
+img[src*=".gif"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
 /* Smooth rotation container */
 .radial-video-buttons .rotating-container {
   transition: transform 0.1s linear;

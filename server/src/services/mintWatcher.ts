@@ -27,7 +27,14 @@ export class MintWatcherService {
             'https://api.mainnet-beta.solana.com',
             'https://solana-api.projectserum.com'
         ];
-        this.connection = new Connection(rpcUrls[0], 'confirmed');
+        this.connection = new Connection(rpcUrls[0], {
+            commitment: 'confirmed',
+            confirmTransactionInitialTimeout: 30000, // 30 seconds
+            disableRetryOnRateLimit: false,
+            httpHeaders: {
+                'User-Agent': 'Solana-Token-Tracker/1.0'
+            }
+        });
     }
 
     async start(): Promise<void> {
@@ -52,10 +59,8 @@ export class MintWatcherService {
                         );
                         
                         if (hasInitializeMint) {
-                            // Process with a small delay to avoid overwhelming the RPC
-                            setTimeout(async () => {
-                                await this.processInitializeMint(logs.signature);
-                            }, Math.random() * 500); // Random delay 0-500ms
+                            // Process immediately for instant token detection
+                            await this.processInitializeMint(logs.signature);
                         }
                     } catch (error) {
                         logger.error('Error processing logs:', error);
@@ -98,8 +103,7 @@ export class MintWatcherService {
         try {
             logger.info(`Processing InitializeMint transaction: ${signature}`);
             
-            // Add delay to avoid rate limiting
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // No delay for instant processing
             
             // Get transaction details with retry logic
             let tx;

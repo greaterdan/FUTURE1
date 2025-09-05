@@ -35,11 +35,11 @@ export class MarketcapUpdaterService {
             logger.info('🚀 Starting marketcap updater service...');
             logger.info(`🔑 Birdeye API Key configured: ${this.birdeyeApiKey ? 'YES' : 'NO'}`);
             
-            // Start the update loop (3 seconds for faster fresh mint processing)
+            // Start the update loop (15 seconds to avoid rate limits)
             this.intervalId = setInterval(async () => {
                 logger.info('⏰ Marketcap update cycle triggered');
                 await this.updateAllTokens();
-            }, 3000); // 3 seconds for faster fresh mint market cap data
+            }, 15000); // 15 seconds to avoid rate limits
 
             this.isRunning = true;
             logger.info('✅ Marketcap updater service started successfully');

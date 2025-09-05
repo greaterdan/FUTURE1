@@ -383,7 +383,7 @@ export const useServerData = (isOpen: boolean) => {
       if (live) {
         const interval = setInterval(() => {
           fetchTokens();
-        }, 10000); // Refresh every 10 seconds for fallback
+        }, 30000); // Reduced frequency: refresh every 30 seconds for fallback
         
         return () => clearInterval(interval);
       }

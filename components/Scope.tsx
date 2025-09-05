@@ -666,23 +666,43 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
               {(() => {
                 const agent = agents.find(a => a.name === attachedCompanion);
                 return agent ? (
-                  <video 
-                    key={`${attachedCompanion}-${agent.videoFile}`} // Force re-render when companion changes
-                    className="w-full h-full object-cover"
-                    autoPlay 
-                    muted 
-                    loop
-                    playsInline
-                    style={{ 
-                      mixBlendMode: 'screen',
-                      filter: 'brightness(1.2) contrast(1.1)',
-                      background: 'transparent',
-                      backgroundColor: 'transparent',
-                      backgroundImage: 'none'
-                    }}
-                  >
-                    <source src={agent.videoFile} type="video/webm" />
-                  </video>
+                  agent.videoFile.endsWith('.gif') ? (
+                    <img 
+                      key={`${attachedCompanion}-${agent.videoFile}`} // Force re-render when companion changes
+                      src={agent.videoFile}
+                      alt={agent.name}
+                      className="w-full h-full object-cover"
+                      style={{ 
+                        mixBlendMode: 'screen',
+                        filter: 'brightness(1.2) contrast(1.1)',
+                        background: 'transparent !important',
+                        backgroundColor: 'transparent !important',
+                        backgroundImage: 'none !important',
+                        backgroundClip: 'padding-box',
+                        WebkitBackgroundClip: 'padding-box'
+                      }}
+                    />
+                  ) : (
+                    <video 
+                      key={`${attachedCompanion}-${agent.videoFile}`} // Force re-render when companion changes
+                      className="w-full h-full object-cover"
+                      autoPlay 
+                      muted 
+                      loop
+                      playsInline
+                      style={{ 
+                        mixBlendMode: 'screen',
+                        filter: 'brightness(1.2) contrast(1.1)',
+                        background: 'transparent !important',
+                        backgroundColor: 'transparent !important',
+                        backgroundImage: 'none !important',
+                        backgroundClip: 'padding-box',
+                        WebkitBackgroundClip: 'padding-box'
+                      }}
+                    >
+                      <source src={agent.videoFile} type="video/webm" />
+                    </video>
+                  )
                 ) : (
                   <div className="w-full h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
                     <span className="text-white font-bold text-xs">
@@ -1313,6 +1333,7 @@ export const Scope = ({
   // Handle companion detach
   const handleCompanionDetach = () => {
     setAttachedCompanion(null);
+    setDraggedAgent(null); // Clear drag state to make companion visible again
   };
   
   // Token filtering state
@@ -1459,22 +1480,22 @@ export const Scope = ({
     {
       name: "The Analyzer",
       description: "Breaks down every token's anatomy: market cap, liquidity depth, holder distribution, wallet flows, and trading frequency — exposing both strength and weakness.",
-      videoFile: "/WIZZARD/The Analyzer.webm"
+      videoFile: "/WIZZARD/The Analyzer.gif"
     },
     {
       name: "The Predictor",
       description: "Uses historical patterns, momentum curves, and volatility signals to forecast where the market is likely to push a token next.",
-      videoFile: "/WIZZARD/The Predictor.webm"
+      videoFile: "/WIZZARD/The Predictor.gif"
     },
     {
       name: "The Quantum Eraser",
       description: "Removes misleading noise like spoofed trades, bot spam, and fake liquidity — reconstructing a clean version of the token's true history.",
-      videoFile: "/WIZZARD/The Quantum Eraser.webm"
+      videoFile: "/WIZZARD/The Quantum Eraser.gif"
     },
     {
       name: "The Retrocasual",
       description: "Simulates future scenarios, then feeds those echoes back into the present — letting potential outcomes reshape today's analysis.",
-      videoFile: "/WIZZARD/The Retrocasual.webm"
+      videoFile: "/WIZZARD/The Retrocasual.gif"
     }
   ];
 
@@ -2102,12 +2123,6 @@ export const Scope = ({
                 
                 
                 
-                {/* Debug Hover State */}
-                {hoveredAgent && (
-                  <div className="fixed top-4 left-4 bg-red-500 text-white p-2 rounded z-99999">
-                    HOVERING: {hoveredAgent.name}
-                  </div>
-                )}
 
                 {/* Companion orbs section - positioned under COMPANIONS header */}
                 <div 
@@ -2186,19 +2201,41 @@ export const Scope = ({
                           setDragTargetToken(null);
                         }}
                       >
-                        <video 
-                          className="w-full h-full object-cover pointer-events-none companion-video"
-                          autoPlay 
-                          muted 
-                          loop
-                          playsInline
-                          style={{ 
-                            mixBlendMode: 'screen',
-                            filter: 'brightness(1.2) contrast(1.1)'
-                          }}
-                        >
-                          <source src={agent.videoFile} type="video/webm" />
-                        </video>
+                        {agent.videoFile.endsWith('.gif') ? (
+                          <img 
+                            src={agent.videoFile}
+                            alt={agent.name}
+                            className="w-full h-full object-cover pointer-events-none companion-video"
+                            style={{ 
+                              mixBlendMode: 'screen',
+                              filter: 'brightness(1.2) contrast(1.1)',
+                              background: 'transparent !important',
+                              backgroundColor: 'transparent !important',
+                              backgroundImage: 'none !important',
+                              backgroundClip: 'padding-box',
+                              WebkitBackgroundClip: 'padding-box'
+                            }}
+                          />
+                        ) : (
+                          <video 
+                            className="w-full h-full object-cover pointer-events-none companion-video"
+                            autoPlay 
+                            muted 
+                            loop
+                            playsInline
+                            style={{ 
+                              mixBlendMode: 'screen',
+                              filter: 'brightness(1.2) contrast(1.1)',
+                              background: 'transparent !important',
+                              backgroundColor: 'transparent !important',
+                              backgroundImage: 'none !important',
+                              backgroundClip: 'padding-box',
+                              WebkitBackgroundClip: 'padding-box'
+                            }}
+                          >
+                            <source src={agent.videoFile} type="video/webm" />
+                          </video>
+                        )}
                         
                       </div>
                     ))}
@@ -2223,20 +2260,41 @@ export const Scope = ({
                         {/* Title with icon */}
                         <div className="flex items-center space-x-3">
                           <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0">
-                            <video 
-                              className="w-full h-full object-cover"
-                              autoPlay 
-                              muted 
-                              loop
-                              playsInline
-                              style={{ 
-                                mixBlendMode: 'screen',
-                                filter: 'brightness(1.2) contrast(1.1)',
-                                background: 'transparent'
-                              }}
-                            >
-                              <source src={hoveredAgent.videoFile} type="video/webm" />
-                            </video>
+                            {hoveredAgent.videoFile.endsWith('.gif') ? (
+                              <img 
+                                src={hoveredAgent.videoFile}
+                                alt={hoveredAgent.name}
+                                className="w-full h-full object-cover"
+                                style={{ 
+                                  mixBlendMode: 'screen',
+                                  filter: 'brightness(1.2) contrast(1.1)',
+                                  background: 'transparent !important',
+                                  backgroundColor: 'transparent !important',
+                                  backgroundImage: 'none !important',
+                                  backgroundClip: 'padding-box',
+                                  WebkitBackgroundClip: 'padding-box'
+                                }}
+                              />
+                            ) : (
+                              <video 
+                                className="w-full h-full object-cover"
+                                autoPlay 
+                                muted 
+                                loop
+                                playsInline
+                                style={{ 
+                                  mixBlendMode: 'screen',
+                                  filter: 'brightness(1.2) contrast(1.1)',
+                                  background: 'transparent !important',
+                                  backgroundColor: 'transparent !important',
+                                  backgroundImage: 'none !important',
+                                  backgroundClip: 'padding-box',
+                                  WebkitBackgroundClip: 'padding-box'
+                                }}
+                              >
+                                <source src={hoveredAgent.videoFile} type="video/webm" />
+                              </video>
+                            )}
                           </div>
                           <h3 className="text-white text-lg font-bold">{hoveredAgent.name}</h3>
                         </div>
