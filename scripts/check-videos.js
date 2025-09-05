@@ -6,7 +6,7 @@ const videoFiles = [
   'public/2.webm', 
   'public/3.webm',
   'public/4.webm',
-  'public/Space_Time_Travel__Seamless_VJ_Loop_uhd_2533132.mp4',
+  'public/Space_Time_Travel__Seamless_VJ_Loop_uhd_2533132_compressed.mp4',
   'public/zodiac/aries.webm',
   'public/zodiac/taurus.webm',
   'public/zodiac/gemini.webm',

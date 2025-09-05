@@ -52,6 +52,125 @@ const StarButton: React.FC<{ tokenMint: string }> = ({ tokenMint }) => {
   );
 };
 
+// Help Button Component
+const HelpButton: React.FC<{ onHelpClick: () => void }> = ({ onHelpClick }) => {
+  return (
+    <motion.button
+      onClick={onHelpClick}
+      className="relative p-2 rounded-full transition-all duration-300 bg-black/20 hover:bg-black/40 border border-gray-700 shadow-md shadow-black/30"
+      initial={{ x: 20, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.95 }}
+    >
+      <svg 
+        className="w-5 h-5 text-white transition-colors duration-200" 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24"
+      >
+        <path 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          strokeWidth={2} 
+          d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+        />
+      </svg>
+    </motion.button>
+  );
+};
+
+// Help Popup Component
+const HelpPopup: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <motion.div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="bg-black/90 border border-white/20 rounded-lg p-6 max-w-4xl w-full mx-4 relative z-[70] shadow-2xl"
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold text-white">How Scope Works</h2>
+          <button
+            onClick={onClose}
+            className="text-white/60 hover:text-white transition-colors duration-200"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white/90">
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-2">🔍 Token Discovery</h3>
+            <p className="text-sm leading-relaxed">
+              Scope automatically discovers and displays new Solana tokens as they're created. 
+              Each token card shows real-time market data, social metrics, and creation information.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-2">⭐ Watchlist</h3>
+            <p className="text-sm leading-relaxed">
+              Click the star button on any token to add it to your watchlist. You can track up to 10 tokens 
+              and access them quickly from the star button in the header.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-2">📊 Market Data</h3>
+            <p className="text-sm leading-relaxed">
+              View real-time market cap, price changes, holder count, and trading volume. 
+              Green indicates positive changes, red indicates negative changes.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-2">🔍 Search & Filter</h3>
+            <p className="text-sm leading-relaxed">
+              Use the search bar to find specific tokens by name or symbol. 
+              Filter tokens by various criteria to narrow down your results.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-2">💬 AI Chat</h3>
+            <p className="text-sm leading-relaxed">
+              Click the chat icon to get AI-powered insights about tokens, market trends, 
+              and trading strategies. Ask questions about any token or market conditions.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <h3 className="text-lg font-semibold text-white mb-2">🎯 Tips</h3>
+            <ul className="text-sm leading-relaxed space-y-1">
+              <li>• Hover over token cards to see additional metrics</li>
+              <li>• Use the refresh button to get the latest data</li>
+              <li>• Check the creation time to identify very new tokens</li>
+              <li>• Monitor holder count for community growth</li>
+              <li>• Watch for tokens with high social engagement</li>
+            </ul>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+};
+
 // Watchlist Context
 const WatchlistContext = React.createContext<{
   watchlist: Set<string>;
@@ -338,7 +457,7 @@ type CardProps = {
   onCompanionAttached?: (companionName: string, token: any) => void;
   agents: Array<{ name: string; videoFile: string }>;
   attachedCompanion?: string | null;
-  onCompanionDetach?: (tokenMint: string) => void;
+  onCompanionDetach?: () => void;
   onHoverEnter?: () => void;
   onHoverLeave?: () => void;
   onFocusToken?: (token: any) => void;
@@ -399,19 +518,9 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     e.preventDefault();
     setIsDragOver(false);
     
-    console.log('Drop event on token:', token.mint);
-    console.log('Data transfer types:', e.dataTransfer.types);
-    console.log('Current attached companion:', attachedCompanion);
-    
     const agentName = e.dataTransfer.getData('text/plain');
-    console.log('Agent name from drop:', agentName);
     
     if (agentName) {
-      if (attachedCompanion) {
-        console.log(`🔄 SWITCHING: Replacing companion ${attachedCompanion} with ${agentName} on token ${token.mint}`);
-      } else {
-        console.log(`✅ SUCCESS: Agent ${agentName} dropped on token ${token.mint}`);
-      }
       
       // Add a success animation
       const card = e.currentTarget as HTMLElement;
@@ -430,7 +539,6 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       // Clear drag target after successful attachment
       onDragTargetChange?.(null);
     } else {
-      console.log('No agent name found in drop data');
       onDragTargetChange?.(null);
     }
   };
@@ -517,7 +625,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
                 const agent = agents.find(a => a.name === attachedCompanion);
                 return agent ? (
                   <video 
-                    key={attachedCompanion} // Force re-render when companion changes
+                    key={`${attachedCompanion}-${agent.videoFile}`} // Force re-render when companion changes
                     className="w-full h-full object-cover"
                     autoPlay 
                     muted 
@@ -668,7 +776,7 @@ function TokenColumn({
   onCompanionAttached,
   agents,
   newTokenMint,
-  attachedCompanions,
+  attachedCompanion,
   onCompanionDetach,
   onHoverEnter,
   onHoverLeave,
@@ -682,8 +790,8 @@ function TokenColumn({
   onCompanionAttached?: (companionName: string, token: any) => void;
   agents: Array<{ name: string; videoFile: string }>;
   newTokenMint: string | null;
-  attachedCompanions: Record<string, string>;
-  onCompanionDetach?: (tokenMint: string) => void;
+  attachedCompanion: {name: string, tokenMint: string} | null;
+  onCompanionDetach?: () => void;
   onHoverEnter?: () => void;
   onHoverLeave?: () => void;
   onFocusToken?: (token: any) => void;
@@ -703,7 +811,7 @@ function TokenColumn({
             <>
               {items.map((token, index) => {
                 const isNewToken = newTokenMint === token.mint;
-                const companionForToken = attachedCompanions[token.mint] || null;
+                const companionForToken = attachedCompanion && attachedCompanion.tokenMint === token.mint ? attachedCompanion.name : null;
                 return (
                   <div 
                     key={`${token.mint}-${token.updated_at || token.created_at || index}`} 
@@ -728,7 +836,7 @@ function TokenColumn({
                           visibleMintsRef={visibleMintsRef} 
                           onCompanionAttached={onCompanionAttached}
                           agents={agents}
-                          attachedCompanion={companionForToken}
+                          attachedCompanion={attachedCompanion && attachedCompanion.tokenMint === token.mint ? attachedCompanion.name : null}
                           onCompanionDetach={onCompanionDetach}
                           onHoverEnter={onHoverEnter}
                           onHoverLeave={onHoverLeave}
@@ -742,7 +850,7 @@ function TokenColumn({
                         visibleMintsRef={visibleMintsRef} 
                         onCompanionAttached={onCompanionAttached}
                         agents={agents}
-                        attachedCompanion={attachedCompanions[token.mint] || null}
+                        attachedCompanion={attachedCompanion && attachedCompanion.tokenMint === token.mint ? attachedCompanion.name : null}
                         onCompanionDetach={onCompanionDetach}
                         onHoverEnter={onHoverEnter}
                         onHoverLeave={onHoverLeave}
@@ -1143,50 +1251,21 @@ export const Scope = ({
   // Track visible mints for performance optimization
   const visibleMintsRef = useRef<Set<string>>(new Set());
   
-  // Track companion attachments globally to persist across re-renders
-  const [attachedCompanions, setAttachedCompanions] = useState<Record<string, string>>({});
-  
-  // Track which companion is currently active (only one at a time)
-  const [activeCompanion, setActiveCompanion] = useState<{name: string, tokenMint: string} | null>(null);
+  // Track which companion is currently attached (only one at a time)
+  const [attachedCompanion, setAttachedCompanion] = useState<{name: string, tokenMint: string} | null>(null);
   
   // Focused token for insights
   const [focusToken, setFocusToken] = useState<any|null>(null);
   
   
-  // Handle companion attachment
+  // Handle companion attachment - only one companion can be attached at a time
   const handleCompanionAttached = (companionName: string, token: any) => {
-    console.log('🔧 COMPANION ATTACHMENT:', { 
-      companionName, 
-      tokenMint: token.mint,
-      tokenName: token.name || token.symbol
-    });
-    
-    // Update both states simultaneously to ensure proper switching
-    const newAttachedCompanions = {
-      [token.mint]: companionName
-    };
-    
-    console.log('🔧 SETTING ATTACHED COMPANIONS:', newAttachedCompanions);
-    setAttachedCompanions(newAttachedCompanions);
-    
-    setActiveCompanion({name: companionName, tokenMint: token.mint});
+    setAttachedCompanion({name: companionName, tokenMint: token.mint});
   };
   
   // Handle companion detach
-  const handleCompanionDetach = (tokenMint: string) => {
-    setAttachedCompanions(prev => {
-      const newState = { ...prev };
-      delete newState[tokenMint];
-      return newState;
-    });
-    
-    // Clear active companion if it was attached to this token
-    setActiveCompanion(prev => {
-      if (prev && prev.tokenMint === tokenMint) {
-        return null;
-      }
-      return prev;
-    });
+  const handleCompanionDetach = () => {
+    setAttachedCompanion(null);
   };
   
   // Token filtering state
@@ -1196,6 +1275,9 @@ export const Scope = ({
   // Chat state
   const [messages, setMessages] = useState<Array<{ type: 'user' | 'assistant'; content: string; timestamp: Date }>>([]);
   const [inputMessage, setInputMessage] = useState('');
+  
+  // Help popup state
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [typingCompanion, setTypingCompanion] = useState<string | null>(null);
   
@@ -1227,6 +1309,7 @@ export const Scope = ({
   // Drag preview state
   const [dragTargetToken, setDragTargetToken] = useState<any>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [draggedAgent, setDraggedAgent] = useState<string | null>(null);
   
 
   // Load conversations from localStorage on component mount
@@ -1320,22 +1403,22 @@ export const Scope = ({
     {
       name: "The Analyzer",
       description: "Breaks down every token's anatomy: market cap, liquidity depth, holder distribution, wallet flows, and trading frequency — exposing both strength and weakness.",
-      videoFile: "/WIZZARD/MagicWizardSphere01_Blue.webm"
+      videoFile: "/WIZZARD/The Analyzer.webm"
     },
     {
       name: "The Predictor",
       description: "Uses historical patterns, momentum curves, and volatility signals to forecast where the market is likely to push a token next.",
-      videoFile: "/WIZZARD/MagicWizardSphere01_Green.webm"
+      videoFile: "/WIZZARD/The Predictor.webm"
     },
     {
       name: "The Quantum Eraser",
       description: "Removes misleading noise like spoofed trades, bot spam, and fake liquidity — reconstructing a clean version of the token's true history.",
-      videoFile: "/WIZZARD/MagicWizardSphere01_Orange.webm"
+      videoFile: "/WIZZARD/The Quantum Eraser.webm"
     },
     {
       name: "The Retrocasual",
       description: "Simulates future scenarios, then feeds those echoes back into the present — letting potential outcomes reshape today's analysis.",
-      videoFile: "/WIZZARD/MagicWizardSphere01_IceBlue.webm"
+      videoFile: "/WIZZARD/The Retrocasual.webm"
     }
   ];
 
@@ -1454,7 +1537,7 @@ export const Scope = ({
     }
     
     console.log('🚀 Sending message:', inputMessage);
-    console.log('🤖 Active companion:', activeCompanion);
+    console.log('🤖 Active companion:', attachedCompanion);
     console.log('📝 Current messages:', messages.length);
     
     const userMessage = { type: 'user' as const, content: inputMessage, timestamp: new Date() };
@@ -1487,7 +1570,7 @@ export const Scope = ({
     }
     
     // Get the active companion or use a random one
-    const currentCompanion = activeCompanion?.name || agents[Math.floor(Math.random() * agents.length)].name;
+    const currentCompanion = attachedCompanion?.name || agents[Math.floor(Math.random() * agents.length)].name;
     setTypingCompanion(currentCompanion);
     setIsTyping(true);
     
@@ -1503,13 +1586,13 @@ export const Scope = ({
       let response: string;
       
       // If there's an active companion attached to a token, use token analysis
-      if (activeCompanion && activeCompanion.tokenMint) {
-        console.log('🎯 Using token analysis for:', activeCompanion.name, 'on token:', activeCompanion.tokenMint);
-        const token = tokens.find(t => t.mint === activeCompanion.tokenMint);
+      if (attachedCompanion && attachedCompanion.tokenMint) {
+        console.log('🎯 Using token analysis for:', attachedCompanion.name, 'on token:', attachedCompanion.tokenMint);
+        const token = tokens.find(t => t.mint === attachedCompanion.tokenMint);
         if (token) {
-          response = await chatService.analyzeToken(token, activeCompanion.name, inputMessage);
+          response = await chatService.analyzeToken(token, attachedCompanion.name, inputMessage);
         } else {
-          response = await chatService.getCompanionResponse(activeCompanion.name, conversationHistory, inputMessage);
+          response = await chatService.getCompanionResponse(attachedCompanion.name, conversationHistory, inputMessage);
         }
       } else {
         console.log('💬 Using general companion response for:', currentCompanion);
@@ -1569,7 +1652,7 @@ export const Scope = ({
         });
       }
     }
-  }, [inputMessage, messages.length, currentConversationId, activeCompanion, tokens, agents]);
+  }, [inputMessage, messages.length, currentConversationId, attachedCompanion, tokens, agents]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -1591,13 +1674,24 @@ export const Scope = ({
 
   // Auto-scroll to bottom when new messages arrive
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   
-  useEffect(() => {
-    // Auto-scroll to bottom when new messages arrive
-    if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Function to scroll to bottom
+  const scrollToBottom = useCallback(() => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, []);
+
+  useEffect(() => {
+    // Auto-scroll to bottom when new messages arrive or typing state changes
+    if (messages.length > 0) {
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        scrollToBottom();
+      });
+    }
+  }, [messages, isTyping, scrollToBottom]);
 
   // Add keyboard shortcut to close SCOPE with Escape key
   useEffect(() => {
@@ -1687,8 +1781,11 @@ export const Scope = ({
             </motion.div>
           </div>
         
-          {/* Right side - Star Button, Close Button */}
+          {/* Right side - Help Button, Star Button, Close Button */}
           <div className="flex justify-end items-center space-x-3">
+            {/* Help Button */}
+            <HelpButton onHelpClick={() => setIsHelpOpen(true)} />
+
             {/* Star Button */}
             <HeaderStarButton tokens={tokens} />
 
@@ -1762,7 +1859,7 @@ export const Scope = ({
                   visibleMintsRef={visibleMintsRef}
                   agents={agents}
                   newTokenMint={newTokenMint}
-                  attachedCompanions={attachedCompanions}
+                  attachedCompanion={attachedCompanion}
                   onCompanionDetach={handleCompanionDetach}
                   onHoverEnter={pauseLiveOnHover}
                   onHoverLeave={resumeLiveAfterHover}
@@ -1823,7 +1920,7 @@ export const Scope = ({
                   focusToken={focusToken}
                   className="border-r border-neutral-800/60 flex-1 min-w-0"
                 />
-                <div className="flex flex-col flex-1 min-w-0 relative h-[calc(100vh-200px)] overflow-hidden">
+                <div className="flex flex-col flex-1 min-w-0 relative h-[calc(100vh-200px)]">
                 {/* Drag Target Preview */}
                 {dragTargetToken && (
                   <motion.div
@@ -1831,7 +1928,7 @@ export const Scope = ({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     className={`mx-3 mt-3 mb-3 p-2 rounded-lg ${
-                      attachedCompanions[dragTargetToken.mint]
+                      attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
                         ? 'bg-orange-500/10 border border-orange-500/30'
                         : 'bg-blue-500/10 border border-blue-500/30'
                     }`}
@@ -1855,7 +1952,7 @@ export const Scope = ({
                           {dragTargetToken.name || dragTargetToken.symbol || 'Unknown Token'}
                         </div>
                         <div className={`text-sm truncate ${
-                          attachedCompanions[dragTargetToken.mint]
+                          attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
                             ? 'text-orange-300'
                             : 'text-blue-300'
                         }`}>
@@ -1863,24 +1960,24 @@ export const Scope = ({
                         </div>
                       </div>
                       <div className={`text-sm font-medium ${
-                        attachedCompanions[dragTargetToken.mint]
+                        attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
                           ? 'text-orange-400'
                           : 'text-blue-400'
                       }`}>
-                        {attachedCompanions[dragTargetToken.mint] ? 'Switch' : 'Target'}
+                        {attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint ? 'Switch' : 'Target'}
                       </div>
                     </div>
                   </motion.div>
                 )}
 
                 {/* Active Companion Preview */}
-                {activeCompanion && (() => {
-                  const token = tokens.find(t => t.mint === activeCompanion.tokenMint);
+                {attachedCompanion && (() => {
+                  const token = tokens.find(t => t.mint === attachedCompanion.tokenMint);
                   if (!token) return null;
                   
                   return (
                     <motion.div
-                      key={activeCompanion.tokenMint}
+                      key={attachedCompanion.tokenMint}
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
@@ -1905,11 +2002,11 @@ export const Scope = ({
                             {token.name || token.symbol || 'Token'}
                           </div>
                           <div className="text-green-300 text-sm truncate">
-                            {activeCompanion.name} • {token.mint.slice(0, 6)}...{token.mint.slice(-6)}
+                            {attachedCompanion.name} • {token.mint.slice(0, 6)}...{token.mint.slice(-6)}
                           </div>
                         </div>
                         <button
-                          onClick={() => handleCompanionDetach(activeCompanion.tokenMint)}
+                          onClick={() => handleCompanionDetach()}
                           className="p-0.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-full transition-all duration-200 hover:scale-110"
                           title="Remove companion"
                         >
@@ -1923,33 +2020,37 @@ export const Scope = ({
                 })()}
                 
                 {/* Companion orbs section - positioned under COMPANIONS header */}
-                <div className="flex justify-center py-4">
+                <div className="flex justify-center py-4 relative z-10 pointer-events-auto">
                   <div className="flex gap-4">
                     {agents.filter(agent => {
-                      // Check if this agent is currently attached to any token
-                      const isAttached = Object.values(attachedCompanions).includes(agent.name);
-                      return !isAttached;
+                      // Only show companions that are NOT currently attached
+                      return !attachedCompanion || attachedCompanion.name !== agent.name;
                     }).map((agent, index) => (
                       <div
                         key={index}
-                        draggable="true"
-                        className="relative w-20 h-20 rounded-full cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110"
-                        style={{ background: 'transparent' }}
+                        draggable={true}
+                        className={`relative w-20 h-20 rounded-full cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110 ${
+                          draggedAgent === agent.name ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                        }`}
+                        style={{ 
+                          background: 'transparent',
+                          pointerEvents: 'auto',
+                          zIndex: 1000
+                        }}
                         onMouseEnter={() => setHoveredAgent(agent)}
                         onMouseLeave={() => setHoveredAgent(null)}
                         onDragStart={(e) => {
-                          console.log('Drag started for:', agent.name);
+                          console.log('DRAG START:', agent.name);
                           e.dataTransfer.setData('text/plain', agent.name);
                           e.dataTransfer.effectAllowed = 'copy';
                           setIsDragging(true);
-                          
-                          // Simple visual feedback - just scale up
-                          (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)';
+                          setDraggedAgent(agent.name);
                         }}
                         onDragEnd={(e) => {
-                          // Reset the scale and drag state
-                          (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+                          console.log('DRAG END:', agent.name);
+                          // Reset the drag state
                           setIsDragging(false);
+                          setDraggedAgent(null);
                           // Clear drag target after a short delay to allow drop handler to run first
                           setTimeout(() => {
                             setDragTargetToken(null);
@@ -1962,6 +2063,7 @@ export const Scope = ({
                           muted 
                           loop
                           playsInline
+                          draggable={false}
                           style={{ 
                             mixBlendMode: 'screen',
                             filter: 'brightness(1.2) contrast(1.1)',
@@ -1980,62 +2082,83 @@ export const Scope = ({
                 </div>
 
                 {/* Main content area with proper height calculation */}
-                <div className="flex-1 flex flex-col min-h-0 max-h-full overflow-hidden">
-                  {/* Messages display area */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
-                    {messages.length === 0 ? (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
-                          Drag a companion onto a token, pick a companion, or start typing to begin…
-                        </div>
-                      </div>
-                    ) : (
-                      messages.map((message, index) => (
-                        <div
-                          key={index}
-                          className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[75%] rounded-lg p-3 break-words ${
-                              message.type === 'user'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-700 text-gray-100'
-                            }`}
-                          >
-                            <div className="text-sm leading-relaxed break-words">{message.content}</div>
-                            <div className={`text-xs mt-1 ${
-                              message.type === 'user' ? 'text-blue-200' : 'text-gray-400'
-                            }`}>
-                              {message.timestamp.toLocaleTimeString()}
-                            </div>
+                <div className="flex-1 flex flex-col min-h-0 max-h-full overflow-hidden relative z-0">
+                  {/* Messages display area - proper chat layout */}
+                  <div 
+                    ref={messagesContainerRef}
+                    className="flex-1 overflow-y-auto scrollbar-hide" 
+                    style={{ 
+                      scrollBehavior: 'smooth',
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none'
+                    }}
+                  >
+                    <div className="flex flex-col justify-end min-h-full p-4 pb-2 relative">
+                      {messages.length === 0 && !isDragging && !draggedAgent ? (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                          <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
+                            Drag a companion onto a token, pick a companion, or start typing to begin…
                           </div>
                         </div>
-                      ))
-                    )}
-                    
-                    {/* Typing indicator */}
-                    {isTyping && typingCompanion && (
-                      <div className="flex justify-start">
-                        <div className="bg-gray-700 text-gray-100 rounded-lg p-3 max-w-[75%]">
-                          <div className="flex items-center space-x-2">
-                            <div className="flex space-x-1">
-                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                            </div>
-                            <span className="text-sm text-gray-400">{typingCompanion} is typing...</span>
-                          </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {messages.map((message, index) => (
+                            <motion.div
+                              key={index}
+                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              transition={{ duration: 0.2, ease: "easeOut" }}
+                              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-1`}
+                            >
+                              <div
+                                className={`max-w-[75%] rounded-2xl px-4 py-3 break-words shadow-sm ${
+                                  message.type === 'user'
+                                    ? 'bg-blue-600 text-white rounded-br-md'
+                                    : 'bg-gray-700 text-gray-100 rounded-bl-md'
+                                }`}
+                              >
+                                <div className="text-sm leading-relaxed break-words">{message.content}</div>
+                                <div className={`text-xs mt-2 ${
+                                  message.type === 'user' ? 'text-blue-200 text-right' : 'text-gray-400 text-left'
+                                }`}>
+                                  {message.timestamp.toLocaleTimeString()}
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                          
+                          {/* Typing indicator */}
+                          {isTyping && typingCompanion && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                              transition={{ duration: 0.2, ease: "easeOut" }}
+                              className="flex justify-start mb-1"
+                            >
+                              <div className="bg-gray-700 text-gray-100 rounded-2xl rounded-bl-md px-4 py-3 max-w-[75%] shadow-sm">
+                                <div className="flex items-center space-x-2">
+                                  <div className="flex space-x-1">
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                  </div>
+                                  <span className="text-sm text-gray-400">{typingCompanion} is typing...</span>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
                         </div>
-                      </div>
-                    )}
-                    
-                    {/* Auto-scroll anchor */}
-                    <div ref={messagesEndRef} />
+                      )}
+                      
+                      {/* Auto-scroll anchor */}
+                      <div ref={messagesEndRef} />
+                    </div>
                   </div>
                   
-                  {/* Chat input row at bottom */}
-                  <div className="shrink-0 border-t border-neutral-800/60">
-                    <div className="w-full p-4 flex justify-center items-center h-20 chat-input-container">
+                  {/* Chat input row at bottom - fixed with proper spacing */}
+                  <div className="shrink-0 border-t border-neutral-800/60 bg-black/95">
+                    <div className="w-full p-4 pt-3 flex justify-center items-center h-20 chat-input-container">
                       <div className="w-full max-w-4xl flex items-center gap-3">
                         {/* Settings Button */}
                         <button
@@ -2062,7 +2185,7 @@ export const Scope = ({
                             onChange={handleInputChange}
                             onKeyPress={handleKeyPress}
                             placeholder="Type your message..."
-                            className="w-full h-12 px-6 py-3 bg-transparent border border-gray-600/30 rounded-full text-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-500/50 transition-all duration-300 hover:border-gray-500/40"
+                            className="w-full h-12 px-6 py-3 bg-gray-800/50 border border-gray-600/30 rounded-full text-gray-200 placeholder-gray-400 focus:outline-none focus:border-blue-500/50 focus:bg-gray-800/70 transition-all duration-300 hover:border-gray-500/40 hover:bg-gray-800/60"
                             style={{ scrollBehavior: 'auto' }}
                           />
                         </div>
@@ -2073,7 +2196,12 @@ export const Scope = ({
                             console.log('🔥 SEND BUTTON CLICKED - Calling sendMessage');
                             sendMessage();
                           }}
-                          className="flex-shrink-0 text-gray-300 hover:text-white rounded-full px-6 py-3 h-12 transition-all duration-300 font-medium"
+                          className={`flex-shrink-0 rounded-full px-4 py-3 h-12 transition-all duration-300 font-medium ${
+                            inputMessage.trim() 
+                              ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl' 
+                              : 'bg-gray-700/50 text-gray-400 cursor-not-allowed'
+                          }`}
+                          disabled={!inputMessage.trim()}
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -2336,9 +2464,9 @@ export const Scope = ({
           </motion.div>
         )}
       </motion.div>
-
-
-
+      
+      {/* Help Popup */}
+      <HelpPopup isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </motion.div>
   );
 };
