@@ -303,8 +303,9 @@ type CardProps = {
   onHoverEnter?: () => void;
   onHoverLeave?: () => void;
   onFocusToken?: (token: any) => void;
+  onDragTargetChange?: (token: any | null) => void;
 };
-const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach, onHoverEnter, onHoverLeave, onFocusToken }) => {
+const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach, onHoverEnter, onHoverLeave, onFocusToken, onDragTargetChange }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
@@ -343,17 +344,22 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    console.log('Drag over token:', token.mint);
-    // Completely disable drag over if companion is already attached
+    console.log('Drag over token:', token.mint, 'Attached companion:', attachedCompanion);
+    
+    // Completely disable drag over if companion is already attached to this token
     if (attachedCompanion) {
+      console.log(`❌ DRAG BLOCKED: Token ${token.mint} already has companion ${attachedCompanion}`);
       return;
     }
+    
     setIsDragOver(true);
+    onDragTargetChange?.(token);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
+    onDragTargetChange?.(null);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -362,10 +368,12 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     
     console.log('Drop event on token:', token.mint);
     console.log('Data transfer types:', e.dataTransfer.types);
+    console.log('Current attached companion:', attachedCompanion);
     
-    // Prevent dropping if a companion is already attached
+    // Prevent dropping if a companion is already attached to this token
     if (attachedCompanion) {
-      console.log(`Token ${token.mint} already has companion ${attachedCompanion} attached`);
+      console.log(`❌ BLOCKED: Token ${token.mint} already has companion ${attachedCompanion} attached`);
+      onDragTargetChange?.(null);
       return;
     }
     
@@ -373,7 +381,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     console.log('Agent name from drop:', agentName);
     
     if (agentName) {
-      console.log(`Agent ${agentName} dropped on token ${token.mint}`);
+      console.log(`✅ SUCCESS: Agent ${agentName} dropped on token ${token.mint}`);
       
       // Add a success animation
       const card = e.currentTarget as HTMLElement;
@@ -388,8 +396,12 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       if (onCompanionAttached) {
         onCompanionAttached(agentName, token);
       }
+      
+      // Clear drag target after successful attachment
+      onDragTargetChange?.(null);
     } else {
       console.log('No agent name found in drop data');
+      onDragTargetChange?.(null);
     }
   };
   
@@ -398,7 +410,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       ref={cardRef}
       className={`group relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-102 hover:z-10 transition-all duration-200 token-card cursor-pointer ${
         isDragOver && !attachedCompanion
-          ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]' 
+          ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]'
           : isClicked
           ? 'border-white/30 bg-white/12 scale-95 shadow-lg shadow-white/20'
           : 'border-white/10 bg-white/6'
@@ -425,6 +437,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           </div>
         </motion.div>
       )}
+
 
       {/* Click ripple effect */}
       {ripplePosition && (
@@ -490,19 +503,6 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
                 );
               })()}
             </div>
-            {/* Detach button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onCompanionDetach) {
-                  onCompanionDetach(token.mint);
-                }
-              }}
-              className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-              title="Detach companion"
-            >
-              ×
-            </button>
           </div>
         </motion.div>
       )}
@@ -633,7 +633,8 @@ function TokenColumn({
   onCompanionDetach,
   onHoverEnter,
   onHoverLeave,
-  onFocusToken
+  onFocusToken,
+  onDragTargetChange
 }: { 
   title: string; 
   items: any[]; 
@@ -647,6 +648,7 @@ function TokenColumn({
   onHoverEnter?: () => void;
   onHoverLeave?: () => void;
   onFocusToken?: (token: any) => void;
+  onDragTargetChange?: (token: any | null) => void;
 }) {
 
   return (
@@ -692,6 +694,7 @@ function TokenColumn({
                           onHoverEnter={onHoverEnter}
                           onHoverLeave={onHoverLeave}
                           onFocusToken={onFocusToken}
+                          onDragTargetChange={onDragTargetChange}
                         />
                       </motion.div>
                     ) : (
@@ -705,6 +708,7 @@ function TokenColumn({
                         onHoverEnter={onHoverEnter}
                         onHoverLeave={onHoverLeave}
                         onFocusToken={onFocusToken}
+                        onDragTargetChange={onDragTargetChange}
                       />
                     )}
                   </div>
@@ -1103,12 +1107,20 @@ export const Scope = ({
   // Track companion attachments globally to persist across re-renders
   const [attachedCompanions, setAttachedCompanions] = useState<Record<string, string>>({});
   
+  // Track which companion is currently active (only one at a time)
+  const [activeCompanion, setActiveCompanion] = useState<{name: string, tokenMint: string} | null>(null);
+  
   // Focused token for insights
   const [focusToken, setFocusToken] = useState<any|null>(null);
   
   
   // Handle companion attachment
   const handleCompanionAttached = (companionName: string, token: any) => {
+    // Clear any existing companion attachments (only one companion at a time)
+    setAttachedCompanions({});
+    setActiveCompanion({name: companionName, tokenMint: token.mint});
+    
+    // Set the new companion attachment
     setAttachedCompanions(prev => ({
       ...prev,
       [token.mint]: companionName
@@ -1121,6 +1133,14 @@ export const Scope = ({
       const newState = { ...prev };
       delete newState[tokenMint];
       return newState;
+    });
+    
+    // Clear active companion if it was attached to this token
+    setActiveCompanion(prev => {
+      if (prev && prev.tokenMint === tokenMint) {
+        return null;
+      }
+      return prev;
     });
   };
   
@@ -1158,6 +1178,10 @@ export const Scope = ({
   // AI Agents state
   const [hoveredAgent, setHoveredAgent] = useState<any>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  
+  // Drag preview state
+  const [dragTargetToken, setDragTargetToken] = useState<any>(null);
+  const [isDragging, setIsDragging] = useState(false);
   
 
   // Load conversations from localStorage on component mount
@@ -1648,6 +1672,7 @@ export const Scope = ({
                   onHoverEnter={pauseLiveOnHover}
                   onHoverLeave={resumeLiveAfterHover}
                   onFocusToken={setFocusToken}
+                  onDragTargetChange={setDragTargetToken}
                   onCompanionAttached={(companionName, token) => {
                     // Handle companion attachment
                     handleCompanionAttached(companionName, token);
@@ -1704,11 +1729,97 @@ export const Scope = ({
                   className="border-r border-gray-700 flex-1 min-w-0"
                 />
                 <div className="flex flex-col flex-1 min-w-0 relative">
+                {/* Drag Target Preview */}
+                {dragTargetToken && !attachedCompanions[dragTargetToken.mint] && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                        {dragTargetToken.imageUrl ? (
+                          <img 
+                            src={`http://localhost:8080/api/img?u=${encodeURIComponent(dragTargetToken.imageUrl)}`}
+                            alt={dragTargetToken.symbol || dragTargetToken.name || "Token"}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                            {(dragTargetToken.symbol || dragTargetToken.name || "T").slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-white text-sm font-medium truncate">
+                          {dragTargetToken.name || dragTargetToken.symbol || 'Unknown Token'}
+                        </div>
+                        <div className="text-blue-300 text-xs truncate">
+                          {dragTargetToken.mint.slice(0, 8)}...{dragTargetToken.mint.slice(-8)}
+                        </div>
+                      </div>
+                      <div className="text-blue-400 text-xs">
+                        Target
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Active Companion Preview */}
+                {activeCompanion && (() => {
+                  const token = tokens.find(t => t.mint === activeCompanion.tokenMint);
+                  if (!token) return null;
+                  
+                  return (
+                    <motion.div
+                      key={activeCompanion.tokenMint}
+                      initial={{ opacity: 0, y: -20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                          {token.imageUrl ? (
+                            <img 
+                              src={`http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}`}
+                              alt={token.symbol || token.name || "Token"}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gradient-to-br from-green-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                              {(token.symbol || token.name || "T").slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white text-sm font-medium truncate">
+                            {token.name || token.symbol || 'Unknown Token'}
+                          </div>
+                          <div className="text-green-300 text-xs truncate">
+                            {activeCompanion.name} • {token.mint.slice(0, 8)}...{token.mint.slice(-8)}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleCompanionDetach(activeCompanion.tokenMint)}
+                          className="p-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-full transition-all duration-200 hover:scale-110"
+                          title="Remove companion"
+                        >
+                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })()}
+                
                 {/* Scroll section */}
                 <div className="flex-1 overflow-y-auto">
                   <div className="flex justify-center">
                     <div className="flex gap-4">
-                      {agents.map((agent, index) => (
+                      {agents.filter(agent => !activeCompanion || activeCompanion.name !== agent.name).map((agent, index) => (
                         <div
                           key={index}
                           draggable="true"
@@ -1720,13 +1831,19 @@ export const Scope = ({
                             console.log('Drag started for:', agent.name);
                             e.dataTransfer.setData('text/plain', agent.name);
                             e.dataTransfer.effectAllowed = 'copy';
+                            setIsDragging(true);
                             
                             // Simple visual feedback - just scale up
                             (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)';
                           }}
                           onDragEnd={(e) => {
-                            // Reset the scale
+                            // Reset the scale and drag state
                             (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+                            setIsDragging(false);
+                            // Clear drag target after a short delay to allow drop handler to run first
+                            setTimeout(() => {
+                              setDragTargetToken(null);
+                            }, 100);
                           }}
                         >
                           <video 
