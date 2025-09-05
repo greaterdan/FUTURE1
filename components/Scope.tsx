@@ -248,7 +248,8 @@ const WatchlistPopup: React.FC<{
   isOpen: boolean; 
   onClose: () => void; 
   tokens: any[]; 
-}> = ({ isOpen, onClose, tokens }) => {
+  onTokenClick?: (token: any) => void;
+}> = ({ isOpen, onClose, tokens, onTokenClick }) => {
   const { watchlist, removeFromWatchlist, isInWatchlist } = React.useContext(WatchlistContext);
   
   const watchlistTokens = tokens.filter(token => isInWatchlist(token.mint));
@@ -296,7 +297,11 @@ const WatchlistPopup: React.FC<{
               {watchlistTokens.map((token) => (
                 <div
                   key={token.mint}
-                  className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10"
+                  className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 cursor-pointer hover:bg-white/10 transition-colors duration-200"
+                  onClick={() => {
+                    onTokenClick?.(token);
+                    onClose(); // Close the watchlist popup when a token is clicked
+                  }}
                 >
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
@@ -322,7 +327,10 @@ const WatchlistPopup: React.FC<{
                     </div>
                   </div>
                   <button
-                    onClick={() => removeFromWatchlist(token.mint)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFromWatchlist(token.mint);
+                    }}
                     className="p-2 text-yellow-400 hover:text-yellow-300 transition-colors duration-200"
                     title="Remove from watchlist"
                   >
@@ -341,7 +349,7 @@ const WatchlistPopup: React.FC<{
 };
 
 // Header Star Button Component
-const HeaderStarButton: React.FC<{ tokens: any[] }> = ({ tokens }) => {
+const HeaderStarButton: React.FC<{ tokens: any[]; onTokenClick?: (token: any) => void }> = ({ tokens, onTokenClick }) => {
   const [isWatchlistOpen, setIsWatchlistOpen] = useState(false);
   const { watchlist } = React.useContext(WatchlistContext);
 
@@ -390,6 +398,7 @@ const HeaderStarButton: React.FC<{ tokens: any[] }> = ({ tokens }) => {
         isOpen={isWatchlistOpen} 
         onClose={() => setIsWatchlistOpen(false)} 
         tokens={tokens}
+        onTokenClick={onTokenClick}
       />
     </>
   );
@@ -1834,7 +1843,7 @@ export const Scope = ({
             <HelpButton onHelpClick={() => setIsHelpOpen(true)} />
 
             {/* Star Button */}
-            <HeaderStarButton tokens={tokens} />
+            <HeaderStarButton tokens={tokens} onTokenClick={setFocusToken} />
 
             {/* Close Button */}
             <motion.button
@@ -2179,22 +2188,13 @@ export const Scope = ({
                       >
                         <video 
                           className="w-full h-full object-cover pointer-events-none companion-video"
-                          preload="auto"
                           autoPlay 
                           muted 
                           loop
                           playsInline
-                          draggable={false}
                           style={{ 
                             mixBlendMode: 'screen',
-                            filter: 'brightness(2) contrast(1.5) saturate(1.2)',
-                            background: 'transparent',
-                            backgroundColor: 'transparent',
-                            backgroundImage: 'none',
-                            backgroundClip: 'content-box',
-                            isolation: 'isolate',
-                            border: 'none',
-                            outline: 'none'
+                            filter: 'brightness(1.2) contrast(1.1)'
                           }}
                         >
                           <source src={agent.videoFile} type="video/webm" />

@@ -7,6 +7,7 @@ import { AnimatePresence } from "framer-motion";
 
 
 // Dynamically import all components to avoid SSR issues
+const MobileNotSupported = dynamic(() => import("@/components/MobileNotSupported"), { ssr: false });
 const BackgroundVideo = dynamic(() => import("@/components/BackgroundVideo"), { ssr: false });
 const LeftTypewriter = dynamic(() => import("@/components/LeftTypewriter"), { ssr: false });
 const RadialVideoButtons = dynamic(() => import("@/components/RadialVideoButtons"), { ssr: false });
@@ -178,6 +179,9 @@ export default function Page() {
   // Show main page
   return (
     <ErrorBoundary>
+      {/* Mobile detection - show mobile message if on mobile */}
+      <MobileNotSupported />
+      
       <main className="fixed inset-0 overflow-visible">
         {/* Always show background components - Scope will overlay on top */}
         <RetroGeometry isSlow={isNavigationHubOpen} isOracleOpen={isOracleHubOpen} isScopeOpen={isScopeOpen} />
