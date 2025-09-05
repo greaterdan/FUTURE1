@@ -12,13 +12,18 @@ import { chatService, ChatMessage } from '../utils/chatService';
 
 // Star Button Component
 const StarButton: React.FC<{ tokenMint: string }> = ({ tokenMint }) => {
-  const { isInWatchlist, addToWatchlist, removeFromWatchlist } = React.useContext(WatchlistContext);
+  const { isInWatchlist, addToWatchlist, removeFromWatchlist, watchlist } = React.useContext(WatchlistContext);
   const isStarred = isInWatchlist(tokenMint);
 
   const handleStarClick = () => {
     if (isStarred) {
       removeFromWatchlist(tokenMint);
     } else {
+      // Check if watchlist is full before adding
+      if (watchlist.size >= 10) {
+        alert('Watchlist is full! Maximum 10 tokens allowed. Remove some tokens first.');
+        return;
+      }
       addToWatchlist(tokenMint);
     }
   };
@@ -64,8 +69,39 @@ const WatchlistContext = React.createContext<{
 const WatchlistProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [watchlist, setWatchlist] = useState<Set<string>>(new Set());
 
+  // Load watchlist from localStorage on component mount
+  useEffect(() => {
+    const savedWatchlist = localStorage.getItem('scope_watchlist');
+    if (savedWatchlist) {
+      try {
+        const parsed = JSON.parse(savedWatchlist);
+        if (Array.isArray(parsed)) {
+          setWatchlist(new Set(parsed));
+        }
+      } catch (error) {
+        console.error('Failed to load watchlist from localStorage:', error);
+      }
+    }
+  }, []);
+
+  // Save watchlist to localStorage whenever it changes
+  useEffect(() => {
+    if (watchlist.size > 0) {
+      localStorage.setItem('scope_watchlist', JSON.stringify([...watchlist]));
+    } else {
+      localStorage.removeItem('scope_watchlist');
+    }
+  }, [watchlist]);
+
   const addToWatchlist = useCallback((mint: string) => {
-    setWatchlist(prev => new Set([...prev, mint]));
+    setWatchlist(prev => {
+      // Check if already at maximum (10 tokens)
+      if (prev.size >= 10) {
+        console.log('Watchlist is full (maximum 10 tokens)');
+        return prev; // Don't add if already at limit
+      }
+      return new Set([...prev, mint]);
+    });
   }, []);
 
   const removeFromWatchlist = useCallback((mint: string) => {
@@ -349,12 +385,6 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     e.preventDefault();
     console.log('Drag over token:', token.mint, 'Attached companion:', attachedCompanion);
     
-    // Completely disable drag over if companion is already attached to this token
-    if (attachedCompanion) {
-      console.log(`❌ DRAG BLOCKED: Token ${token.mint} already has companion ${attachedCompanion}`);
-      return;
-    }
-    
     setIsDragOver(true);
     onDragTargetChange?.(token);
   };
@@ -373,18 +403,15 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     console.log('Data transfer types:', e.dataTransfer.types);
     console.log('Current attached companion:', attachedCompanion);
     
-    // Prevent dropping if a companion is already attached to this token
-    if (attachedCompanion) {
-      console.log(`❌ BLOCKED: Token ${token.mint} already has companion ${attachedCompanion} attached`);
-      onDragTargetChange?.(null);
-      return;
-    }
-    
     const agentName = e.dataTransfer.getData('text/plain');
     console.log('Agent name from drop:', agentName);
     
     if (agentName) {
-      console.log(`✅ SUCCESS: Agent ${agentName} dropped on token ${token.mint}`);
+      if (attachedCompanion) {
+        console.log(`🔄 SWITCHING: Replacing companion ${attachedCompanion} with ${agentName} on token ${token.mint}`);
+      } else {
+        console.log(`✅ SUCCESS: Agent ${agentName} dropped on token ${token.mint}`);
+      }
       
       // Add a success animation
       const card = e.currentTarget as HTMLElement;
@@ -395,7 +422,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
         card.style.transform = 'scale(1)';
       }, 200);
       
-      // Notify parent component about companion attachment
+      // Notify parent component about companion attachment (this will replace existing companion)
       if (onCompanionAttached) {
         onCompanionAttached(agentName, token);
       }
@@ -411,11 +438,13 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
   return (
     <div
       ref={cardRef}
-      className={`group relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-102 hover:z-10 transition-all duration-200 token-card cursor-pointer ${
-        isDragOver && !attachedCompanion
-          ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]'
+      className={`group relative isolate overflow-visible rounded-xl border p-4 hover:scale-102 hover:z-10 transition-all duration-200 token-card cursor-pointer ${
+        isDragOver
+          ? attachedCompanion
+            ? 'border-orange-400 bg-orange-500/20 scale-105 z-20 ring-2 ring-orange-400/50 animate-pulse'
+            : 'border-blue-400 bg-blue-500/20 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse'
           : isClicked
-          ? 'border-white/30 bg-white/12 scale-95 shadow-lg shadow-white/20'
+          ? 'border-white/30 bg-white/12 scale-95'
           : 'border-white/10 bg-white/6'
       }`}
       style={{ willChange: 'transform', pointerEvents: 'auto' }}
@@ -428,15 +457,21 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       draggable={false}
     >
       {/* Drop indicator overlay */}
-      {isDragOver && !attachedCompanion && (
+      {isDragOver && (
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
-          className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-xl border-2 border-dashed border-blue-400/60 flex items-center justify-center z-10 backdrop-blur-sm"
+          className={`absolute inset-0 rounded-xl border-2 border-dashed flex items-center justify-center z-10 backdrop-blur-sm ${
+            attachedCompanion
+              ? 'bg-gradient-to-br from-orange-500/20 to-red-500/20 border-orange-400/60'
+              : 'bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-blue-400/60'
+          }`}
         >
-          <div className="text-blue-400 text-sm font-medium flex items-center space-x-2 bg-black/50 px-3 py-2 rounded-lg">
-            <span>Drop Companion Here</span>
+          <div className={`text-sm font-medium flex items-center space-x-2 bg-black/50 px-3 py-2 rounded-lg ${
+            attachedCompanion ? 'text-orange-400' : 'text-blue-400'
+          }`}>
+            <span>{attachedCompanion ? 'Switch Companion' : 'Drop Companion Here'}</span>
           </div>
         </motion.div>
       )}
@@ -482,6 +517,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
                 const agent = agents.find(a => a.name === attachedCompanion);
                 return agent ? (
                   <video 
+                    key={attachedCompanion} // Force re-render when companion changes
                     className="w-full h-full object-cover"
                     autoPlay 
                     muted 
@@ -656,7 +692,7 @@ function TokenColumn({
 
   return (
     <div className={`flex flex-col min-w-0 flex-1 relative z-0 ${className}`}>
-      <div className="rounded-2xl bg-black/15 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6">
+      <div className="bg-black/15 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6">
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
             <div className="text-center text-white/40 py-8">
@@ -738,13 +774,13 @@ function InsightCard({
   className?: string; 
 }) {
   return (
-    <div className={`group rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.06] hover:border-white/15 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] transition-all duration-200 hover:-translate-y-0.5 px-4 py-3 desktop:px-4 desktop:py-3 px-3 py-2 mr-2 ${className}`}>
+    <div className={`group rounded-2xl bg-white/[0.04] hover:bg-white/[0.06] transition-all duration-200 hover:-translate-y-0.5 px-4 py-3 desktop:px-4 desktop:py-3 px-3 py-2 mr-2 shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-black/30 ${className}`}>
       {/* Header row */}
       <div className="flex items-center gap-2 mb-2">
         {icon}
         <h3 className="uppercase tracking-wider text-[11px] text-white/70 font-mono">{title}</h3>
       </div>
-      <div className="border-b border-white/10 -mx-4 mt-2 mb-3" />
+      <div className="border-b border-neutral-800/60 -mx-4 mt-2 mb-3" />
       {children}
     </div>
   );
@@ -859,7 +895,7 @@ function InsightsColumn({
 
   return (
     <div className={`flex flex-col min-w-0 flex-1 relative z-0 ${className}`}>
-      <div className="overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6">
+      <div className="bg-black/15 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6">
         {!focusToken ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
@@ -869,7 +905,7 @@ function InsightsColumn({
         ) : (
           <div className="space-y-3">
             {/* Selected Token Card */}
-            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] mr-2">
+            <div className="rounded-2xl bg-white/[0.04] p-3 mr-2 shadow-lg shadow-black/20">
               <div className="flex items-center gap-3">
                 {/* Token Avatar */}
                 <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
@@ -1119,15 +1155,21 @@ export const Scope = ({
   
   // Handle companion attachment
   const handleCompanionAttached = (companionName: string, token: any) => {
-    // Clear any existing companion attachments (only one companion at a time)
-    setAttachedCompanions({});
-    setActiveCompanion({name: companionName, tokenMint: token.mint});
+    console.log('🔧 COMPANION ATTACHMENT:', { 
+      companionName, 
+      tokenMint: token.mint,
+      tokenName: token.name || token.symbol
+    });
     
-    // Set the new companion attachment
-    setAttachedCompanions(prev => ({
-      ...prev,
+    // Update both states simultaneously to ensure proper switching
+    const newAttachedCompanions = {
       [token.mint]: companionName
-    }));
+    };
+    
+    console.log('🔧 SETTING ATTACHED COMPANIONS:', newAttachedCompanions);
+    setAttachedCompanions(newAttachedCompanions);
+    
+    setActiveCompanion({name: companionName, tokenMint: token.mint});
   };
   
   // Handle companion detach
@@ -1593,7 +1635,7 @@ export const Scope = ({
     >
       {/* Header */}
       <motion.div 
-        className="bg-black/80 border-b border-white/10 p-4 flex-shrink-0"
+        className="bg-black/80 border-b border-neutral-800/60 p-4 flex-shrink-0"
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
@@ -1697,26 +1739,26 @@ export const Scope = ({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div className="flex flex-col border border-neutral-800/60 rounded-lg overflow-hidden">
             {/* Shared Header Row */}
-            <div className="flex border-b border-white/10">
-              <div className="flex-1 text-center py-2">
-                <h2 className="text-xs uppercase tracking-wider text-white/70">Fresh Mints</h2>
+            <div className="flex border-b border-neutral-800/60">
+              <div className="flex-1 text-center py-4 border-r border-neutral-800/60">
+                <h2 className="text-lg font-bold uppercase tracking-wider text-white">Fresh Mints</h2>
               </div>
-              <div className="flex-1 text-center py-2">
-                <h2 className="text-xs uppercase tracking-wider text-white/70">Insights</h2>
+              <div className="flex-1 text-center py-4 border-r border-neutral-800/60">
+                <h2 className="text-lg font-bold uppercase tracking-wider text-white">Insights</h2>
               </div>
-              <div className="flex-1 text-center py-2">
-                <h2 className="text-xs uppercase tracking-wider text-white/70">Companions</h2>
+              <div className="flex-1 text-center py-4">
+                <h2 className="text-lg font-bold uppercase tracking-wider text-white">Companions</h2>
               </div>
             </div>
             
             {/* Content Row */}
-            <div className="flex gap-6 mt-3">
+            <div className="flex">
               <TokenColumn 
                 title="" 
                 items={filteredTokens.newPairs} 
-                className="border-r border-gray-700 flex-1 min-w-0"
+                className="border-r border-neutral-800/60 flex-1 min-w-0"
                   visibleMintsRef={visibleMintsRef}
                   agents={agents}
                   newTokenMint={newTokenMint}
@@ -1756,7 +1798,7 @@ export const Scope = ({
                         // Add analysis message
                         const analysisMessage = {
                           type: 'assistant' as const,
-                          content: `${companionName}: I've analyzed ${token.name || token.symbol || 'this token'}. Market cap: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'This is on a bonding curve - interesting dynamics ahead!' : 'Standard token with typical market behavior.'}`,
+                          content: `${companionName}: Analyzed ${token.name || token.symbol || 'this token'}. MC: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'On bonding curve - interesting dynamics!' : 'Standard market behavior.'}`,
                           timestamp: new Date()
                         };
                         setMessages(prev => [analysisMessage, ...prev]);
@@ -1779,19 +1821,23 @@ export const Scope = ({
                 />
                 <InsightsColumn 
                   focusToken={focusToken}
-                  className="border-r border-gray-700 flex-1 min-w-0"
+                  className="border-r border-neutral-800/60 flex-1 min-w-0"
                 />
                 <div className="flex flex-col flex-1 min-w-0 relative h-[calc(100vh-200px)] overflow-hidden">
                 {/* Drag Target Preview */}
-                {dragTargetToken && !attachedCompanions[dragTargetToken.mint] && (
+                {dragTargetToken && (
                   <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
-                    className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg"
+                    className={`mx-3 mt-3 mb-3 p-2 rounded-lg ${
+                      attachedCompanions[dragTargetToken.mint]
+                        ? 'bg-orange-500/10 border border-orange-500/30'
+                        : 'bg-blue-500/10 border border-blue-500/30'
+                    }`}
                   >
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
                         {dragTargetToken.imageUrl ? (
                           <img 
                             src={`http://localhost:8080/api/img?u=${encodeURIComponent(dragTargetToken.imageUrl)}`}
@@ -1799,7 +1845,7 @@ export const Scope = ({
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                          <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
                             {(dragTargetToken.symbol || dragTargetToken.name || "T").slice(0, 2).toUpperCase()}
                           </div>
                         )}
@@ -1808,12 +1854,20 @@ export const Scope = ({
                         <div className="text-white text-sm font-medium truncate">
                           {dragTargetToken.name || dragTargetToken.symbol || 'Unknown Token'}
                         </div>
-                        <div className="text-blue-300 text-xs truncate">
-                          {dragTargetToken.mint.slice(0, 8)}...{dragTargetToken.mint.slice(-8)}
+                        <div className={`text-sm truncate ${
+                          attachedCompanions[dragTargetToken.mint]
+                            ? 'text-orange-300'
+                            : 'text-blue-300'
+                        }`}>
+                          {dragTargetToken.mint.slice(0, 6)}...{dragTargetToken.mint.slice(-6)}
                         </div>
                       </div>
-                      <div className="text-blue-400 text-xs">
-                        Target
+                      <div className={`text-sm font-medium ${
+                        attachedCompanions[dragTargetToken.mint]
+                          ? 'text-orange-400'
+                          : 'text-blue-400'
+                      }`}>
+                        {attachedCompanions[dragTargetToken.mint] ? 'Switch' : 'Target'}
                       </div>
                     </div>
                   </motion.div>
@@ -1830,10 +1884,10 @@ export const Scope = ({
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg"
+                      className="mx-3 mt-3 mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg"
                     >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
                           {token.imageUrl ? (
                             <img 
                               src={`http://localhost:8080/api/img?u=${encodeURIComponent(token.imageUrl)}`}
@@ -1841,25 +1895,25 @@ export const Scope = ({
                               className="w-full h-full object-cover"
                             />
                           ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-green-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                            <div className="w-full h-full bg-gradient-to-br from-green-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold">
                               {(token.symbol || token.name || "T").slice(0, 2).toUpperCase()}
                             </div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-white text-sm font-medium truncate">
-                            {token.name || token.symbol || 'Unknown Token'}
+                            {token.name || token.symbol || 'Token'}
                           </div>
-                          <div className="text-green-300 text-xs truncate">
-                            {activeCompanion.name} • {token.mint.slice(0, 8)}...{token.mint.slice(-8)}
+                          <div className="text-green-300 text-sm truncate">
+                            {activeCompanion.name} • {token.mint.slice(0, 6)}...{token.mint.slice(-6)}
                           </div>
                         </div>
                         <button
                           onClick={() => handleCompanionDetach(activeCompanion.tokenMint)}
-                          className="p-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-full transition-all duration-200 hover:scale-110"
+                          className="p-0.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-full transition-all duration-200 hover:scale-110"
                           title="Remove companion"
                         >
-                          <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
@@ -1871,7 +1925,11 @@ export const Scope = ({
                 {/* Companion orbs section - positioned under COMPANIONS header */}
                 <div className="flex justify-center py-4">
                   <div className="flex gap-4">
-                    {agents.filter(agent => !activeCompanion || activeCompanion.name !== agent.name).map((agent, index) => (
+                    {agents.filter(agent => {
+                      // Check if this agent is currently attached to any token
+                      const isAttached = Object.values(attachedCompanions).includes(agent.name);
+                      return !isAttached;
+                    }).map((agent, index) => (
                       <div
                         key={index}
                         draggable="true"
@@ -1938,13 +1996,13 @@ export const Scope = ({
                           className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[80%] rounded-lg p-3 ${
+                            className={`max-w-[75%] rounded-lg p-3 break-words ${
                               message.type === 'user'
                                 ? 'bg-blue-600 text-white'
                                 : 'bg-gray-700 text-gray-100'
                             }`}
                           >
-                            <div className="text-base">{message.content}</div>
+                            <div className="text-sm leading-relaxed break-words">{message.content}</div>
                             <div className={`text-xs mt-1 ${
                               message.type === 'user' ? 'text-blue-200' : 'text-gray-400'
                             }`}>
@@ -1958,7 +2016,7 @@ export const Scope = ({
                     {/* Typing indicator */}
                     {isTyping && typingCompanion && (
                       <div className="flex justify-start">
-                        <div className="bg-gray-700 text-gray-100 rounded-lg p-3 max-w-[80%]">
+                        <div className="bg-gray-700 text-gray-100 rounded-lg p-3 max-w-[75%]">
                           <div className="flex items-center space-x-2">
                             <div className="flex space-x-1">
                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
@@ -1976,41 +2034,52 @@ export const Scope = ({
                   </div>
                   
                   {/* Chat input row at bottom */}
-                  <div className="shrink-0">
-                    <div className="w-full bg-black/70 border-t border-gray-700 p-2 flex items-center gap-2 h-16 chat-input-container">
-                      <input
-                        type="text"
-                        value={inputMessage}
-                        onChange={handleInputChange}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type your message..."
-                        className="flex-1 rounded-lg bg-gray-900 p-1.5 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 h-9 ml-1"
-                        style={{ scrollBehavior: 'auto' }}
-                      />
-                      <button
-                        onClick={() => {
-                          setIsSettingsOpen(!isSettingsOpen);
-                          if (!isSettingsOpen) {
-                            setSettingsView('menu');
-                          }
-                        }}
-                        className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3 py-1.5 h-9 transition-colors duration-200"
-                        title="Settings & History"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => {
-                          console.log('🔥 SEND BUTTON CLICKED - Calling sendMessage');
-                          sendMessage();
-                        }}
-                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 h-9"
-                      >
-                        Send
-                      </button>
+                  <div className="shrink-0 border-t border-neutral-800/60">
+                    <div className="w-full p-4 flex justify-center items-center h-20 chat-input-container">
+                      <div className="w-full max-w-4xl flex items-center gap-3">
+                        {/* Settings Button */}
+                        <button
+                          onClick={() => {
+                            setIsSettingsOpen(!isSettingsOpen);
+                            if (!isSettingsOpen) {
+                              setSettingsView('menu');
+                            }
+                          }}
+                          className="flex-shrink-0 text-gray-300 hover:text-white rounded-full p-3 h-12 w-12 transition-all duration-300"
+                          title="Settings & History"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </button>
+
+                        {/* Input Field */}
+                        <div className="flex-1 relative">
+                          <input
+                            type="text"
+                            value={inputMessage}
+                            onChange={handleInputChange}
+                            onKeyPress={handleKeyPress}
+                            placeholder="Type your message..."
+                            className="w-full h-12 px-6 py-3 bg-transparent border border-gray-600/30 rounded-full text-gray-200 placeholder-gray-400 focus:outline-none focus:border-gray-500/50 transition-all duration-300 hover:border-gray-500/40"
+                            style={{ scrollBehavior: 'auto' }}
+                          />
+                        </div>
+
+                        {/* Send Button */}
+                        <button
+                          onClick={() => {
+                            console.log('🔥 SEND BUTTON CLICKED - Calling sendMessage');
+                            sendMessage();
+                          }}
+                          className="flex-shrink-0 text-gray-300 hover:text-white rounded-full px-6 py-3 h-12 transition-all duration-300 font-medium"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                          </svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2236,6 +2305,7 @@ export const Scope = ({
                             if (confirm('Clear all conversation history?')) {
                               setConversationHistory([]);
                               localStorage.removeItem('scope_conversations');
+                              setIsSettingsOpen(false);
                             }
                           }}
                           className="text-red-400 hover:text-red-300 text-xs transition-colors"

@@ -1,0 +1,22 @@
+# FUTURE Project Environment Variables Template
+# Copy this file to .env.local and add your actual API keys
+
+# XAI API Key (for Grok AI chat service)
+NEXT_PUBLIC_XAI_API_KEY=your_xai_api_key_here
+
+# Helius API Key (for Solana RPC)
+NEXT_PUBLIC_HELIUS_API_KEY=your_helius_api_key_here
+HELIUS_API_KEY=your_helius_api_key_here
+HELIUS_RPC_URL=https://mainnet.helius-rpc.com/?api-key=your_helius_api_key_here
+
+# Birdeye API Key (for market data)
+NEXT_PUBLIC_BIRDEYE_API_KEY=your_birdeye_api_key_here
+BIRDEYE_API_KEY=your_birdeye_api_key_here
+
+# Jupiter API Key (for DEX aggregator)
+NEXT_PUBLIC_JUPITER_API_KEY=your_jupiter_api_key_here
+JUPITER_API_KEY=your_jupiter_api_key_here
+
+# Server Configuration
+PORT=8080
+NODE_ENV=development

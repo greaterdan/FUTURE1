@@ -143,17 +143,24 @@ FUTURE/
 ## 🔧 Configuration
 
 ### **Environment Variables**
-Create a `.env.local` file in the root directory:
+**🔑 IMPORTANT**: You need to set up API keys to use all features!
 
-```env
-# Server Configuration
-SERVER_BASE_URL=http://localhost:8080
-NEXT_PUBLIC_API_URL=http://localhost:8080/api
+1. **Copy the environment template:**
+   ```bash
+   cp env-template.txt .env.local
+   ```
 
-# Optional: Custom configurations
-NEXT_PUBLIC_APP_NAME=FUTURE
-NEXT_PUBLIC_VERSION=1.0.0
-```
+2. **Edit `.env.local` with your actual API keys** (see [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for detailed instructions)
+
+**Required API Keys:**
+- **XAI API Key** - For AI chat functionality (Grok AI)
+- **Helius API Key** - For Solana blockchain data
+
+**Optional API Keys:**
+- **Birdeye API Key** - For enhanced market data
+- **Jupiter API Key** - For DEX aggregator features
+
+See [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for complete setup instructions and where to get API keys.
 
 ### **Server Setup**
 The project includes a backend server in the `server/` directory:

@@ -1,6 +1,8 @@
 const { Connection, PublicKey } = require('@solana/web3.js');
 
-const RPC_ENDPOINT = "https://mainnet.helius-rpc.com/?api-key=099d5df1-149d-445e-b861-7269571c1804";
+const RPC_ENDPOINT = process.env.HELIUS_RPC_URL || process.env.NEXT_PUBLIC_HELIUS_API_KEY 
+  ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY || process.env.NEXT_PUBLIC_HELIUS_API_KEY}`
+  : "https://mainnet.helius-rpc.com/?api-key=your_helius_api_key_here";
 const PUMP_FUN_PROGRAM_ID = "6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P";
 
 async function debugDetection() {

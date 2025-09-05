@@ -35,7 +35,7 @@ async function testMarketcapService() {
         if (eligibleTokens.length > 0) {
             console.log('\n🌐 Test 3: Testing Birdeye API call...');
             const testToken = eligibleTokens[0];
-            const apiKey = 'd3bc5f96f223472bb4cc32273fd47d0c';
+            const apiKey = process.env.BIRDEYE_API_KEY || 'your_birdeye_api_key_here';
             
             const response = await fetch(`https://public-api.birdeye.so/defi/price?address=${testToken.mint}&ui_amount_mode=raw`, {
                 headers: { 

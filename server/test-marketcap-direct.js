@@ -11,7 +11,7 @@ async function testMarketcapUpdater() {
         console.log('Testing Birdeye API...');
         const response = await fetch(`https://public-api.birdeye.so/defi/price?address=${testToken}&ui_amount_mode=raw`, {
             headers: { 
-                'X-API-KEY': 'd3bc5f96f223472bb4cc32273fd47d0c',
+                'X-API-KEY': process.env.BIRDEYE_API_KEY || 'your_birdeye_api_key_here',
                 'x-chain': 'solana',
                 'accept': 'application/json'
             }

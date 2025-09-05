@@ -28,7 +28,7 @@ class ChatService {
   private baseUrl: string = 'https://api.x.ai/v1/chat/completions';
 
   constructor() {
-    this.apiKey = 'xai-tKe80gHI5lhwzS1FpskofUiAQ57YgsZYicuJqzqq9cC5vVzziGMzmyDeSCznfIPQIM1Zj40iHKctCrsb';
+    this.apiKey = process.env.NEXT_PUBLIC_XAI_API_KEY || '';
   }
 
   async sendMessage(

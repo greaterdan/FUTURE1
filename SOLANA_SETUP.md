@@ -7,8 +7,8 @@ Your Scope component is now wired to real Solana blockchain data! It listens for
 
 Your Scope is **ready to use** with the correct Solana program IDs and Helius RPC endpoint:
 
-- **RPC**: `https://mainnet.helius-rpc.com/?api-key=099d5df1-149d-445e-b861-7269571c1804`
-- **WebSocket**: `wss://mainnet.helius-rpc.com/?api-key=099d5df1-149d-445e-b861-7269571c1804`
+- **RPC**: `https://mainnet.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY`
+- **WebSocket**: `wss://mainnet.helius-rpc.com/?api-key=YOUR_HELIUS_API_KEY`
 
 ## 🔧 **Program IDs (Corrected)**
 
