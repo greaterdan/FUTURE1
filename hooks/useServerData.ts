@@ -26,6 +26,10 @@ export interface ServerTokenData {
   created_at: string;
   updated_at: string;
   display_name?: string;
+  // Social media links from metadata
+  website?: string;
+  twitter?: string;
+  telegram?: string;
   // Fixed: backend returns these properties directly on the token, not nested
   price_usd?: number;
   marketcap?: number;
@@ -50,6 +54,11 @@ export interface TransformedTokenData {
   price_usd?: number;
   volume_24h?: number;
   liquidity?: number;
+  source: string;
+  // Social media links from metadata
+  website?: string;
+  twitter?: string;
+  telegram?: string;
   links: {
     dexscreener: string;
     jupiter: string;
@@ -92,6 +101,11 @@ const transformTokenData = (serverToken: ServerTokenData): TransformedTokenData 
     price_usd: serverToken.price_usd, // Fixed: match UI component expectations
     volume_24h: serverToken.volume_24h, // Fixed: match UI component expectations
     liquidity: serverToken.liquidity, // Fixed: use direct property
+    source: serverToken.source,
+    // Social media links from metadata
+    website: serverToken.website,
+    twitter: serverToken.twitter,
+    telegram: serverToken.telegram,
     links: {
       dexscreener: `https://dexscreener.com/solana/${serverToken.mint}`,
       jupiter: `https://jup.ag/swap/SOL-${serverToken.mint}`,

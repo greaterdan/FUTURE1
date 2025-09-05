@@ -533,7 +533,13 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       
       {/* Badges row */}
       <div className="mt-3 flex items-center gap-2">
-        <SocialBadges links={token.links} />
+        <SocialBadges 
+          links={token.links} 
+          website={token.website}
+          twitter={token.twitter}
+          telegram={token.telegram}
+          source={token.source}
+        />
         <span className="text-xs text-white/30 font-mono ml-auto">
           {token.mint.slice(0, 4)}...{token.mint.slice(-4)}
         </span>
@@ -594,9 +600,6 @@ function TokenColumn({
             </div>
           ) : (
             <>
-              <div className="text-xs text-white/40 mb-2 text-center">
-                {items.length} tokens
-              </div>
               {items.map((token, index) => {
                 const isNewToken = newTokenMint === token.mint;
                 const companionForToken = attachedCompanions[token.mint] || null;
@@ -875,8 +878,8 @@ export const Scope = ({
       isOnCurve: t.isOnCurve // Use transformed property name
     })));
     
-    // Use transformed property names from useServerData and limit to 30 tokens each
-    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh').slice(0, 30); // Show fresh tokens (the actual fresh mints)
+    // Use transformed property names from useServerData and limit to 40 tokens each
+    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh').slice(0, 40); // Show fresh tokens (the actual fresh mints)
     const filled = tokensToFilter.filter(t => t && t.status === 'active' && !t.isOnCurve).slice(0, 30); // Show active tokens
     // EDGE: Fresh tokens sorted by marketcap (highest to lowest, up to 84K)
     const onEdge = tokensToFilter

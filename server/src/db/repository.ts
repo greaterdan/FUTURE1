@@ -248,6 +248,36 @@ export class TokenRepository {
         return rows.map((r: any) => r.mint);
     }
 
+    async findMintsNeedingSocialLinks(limit: number): Promise<string[]> {
+        const { rows } = await db.query(
+            `
+            SELECT mint
+            FROM tokens
+            WHERE
+                metadata_uri IS NOT NULL 
+                AND metadata_uri != ''
+                AND (
+                    website IS NULL 
+                    OR twitter IS NULL 
+                    OR telegram IS NULL 
+                    OR source = 'helius'
+                )
+            ORDER BY blocktime DESC NULLS LAST
+            LIMIT $1
+            `,
+            [limit]
+        );
+        return rows.map((r: any) => r.mint);
+    }
+
+    async getTokenByMint(mint: string): Promise<Token | null> {
+        const { rows } = await db.query(
+            `SELECT * FROM tokens WHERE mint = $1`,
+            [mint]
+        );
+        return rows.length > 0 ? rows[0] : null;
+    }
+
     async updateTokenMetadataByMint(
         mint: string,
         fields: {
@@ -255,6 +285,10 @@ export class TokenRepository {
             symbol?: string;
             metadata_uri?: string; 
             image_url?: string;
+            website?: string;
+            twitter?: string;
+            telegram?: string;
+            source?: string;
         }
     ): Promise<void> {
         const q = `
@@ -262,7 +296,11 @@ export class TokenRepository {
                 name = COALESCE($2, name),
                 symbol = COALESCE($3, symbol),
                 metadata_uri = COALESCE($4, metadata_uri),
-                image_url = COALESCE($5, image_url)
+                image_url = COALESCE($5, image_url),
+                website = COALESCE($6, website),
+                twitter = COALESCE($7, twitter),
+                telegram = COALESCE($8, telegram),
+                source = COALESCE($9, source)
             WHERE mint = $1
         `;
         await db.query(q, [
@@ -270,7 +308,11 @@ export class TokenRepository {
             fields.name ?? null,
             fields.symbol ?? null,
             fields.metadata_uri ?? null,
-            fields.image_url ?? null
+            fields.image_url ?? null,
+            fields.website ?? null,
+            fields.twitter ?? null,
+            fields.telegram ?? null,
+            fields.source ?? null
         ]);
         logger.info(`Updated token ${mint} metadata`);
     }
