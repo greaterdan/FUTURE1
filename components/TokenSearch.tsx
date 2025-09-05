@@ -105,10 +105,14 @@ export default function TokenSearch({ onTokenSelect, placeholder = "Search by to
 
   // Handle token selection
   const handleTokenSelect = useCallback((token: TokenSearchResult) => {
-    setQuery(token.name || token.symbol || token.mint);
+    // Clear the search input completely
+    setQuery('');
     setShowDropdown(false);
     setResults([]);
     setSelectedIndex(-1);
+    
+    // Blur the input to remove focus
+    inputRef.current?.blur();
     
     if (onTokenSelect) {
       onTokenSelect(token);
@@ -129,12 +133,12 @@ export default function TokenSearch({ onTokenSelect, placeholder = "Search by to
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Focus input when component mounts
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, []);
+  // Focus input when component mounts (removed auto-focus to prevent issues)
+  // useEffect(() => {
+  //   if (inputRef.current) {
+  //     inputRef.current.focus();
+  //   }
+  // }, []);
 
   const formatPrice = (price?: number) => {
     if (!price) return 'N/A';

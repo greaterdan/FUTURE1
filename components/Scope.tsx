@@ -100,17 +100,19 @@ const WatchlistPopup: React.FC<{
 
   return (
     <motion.div
-      className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-center justify-center"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
       onClick={onClose}
     >
       <motion.div
-        className="bg-black/90 border border-white/20 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden"
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
+        className="bg-black/90 border border-white/20 rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden relative z-[70] shadow-2xl"
+        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
@@ -1229,6 +1231,9 @@ export const Scope = ({
         tokenElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     }
+    
+    // Clear the search input and close dropdown
+    // This will be handled by the TokenSearch component itself
   }, [tokens]);
 
   // Reset filter when tokens change
