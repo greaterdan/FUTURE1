@@ -307,6 +307,8 @@ type CardProps = {
 const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach, onHoverEnter, onHoverLeave, onFocusToken }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isClicked, setIsClicked] = useState(false);
+  const [ripplePosition, setRipplePosition] = useState<{ x: number; y: number } | null>(null);
   
   
   const copyMintAddress = async () => {
@@ -315,6 +317,28 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     } catch (err) {
       console.error('Failed to copy mint address:', err);
     }
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Get click position relative to the card
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Add click effect
+    setIsClicked(true);
+    setRipplePosition({ x, y });
+    
+    // Reset effects after animation
+    setTimeout(() => {
+      setIsClicked(false);
+      setRipplePosition(null);
+    }, 300);
+    
+    // Call the original focus function
+    onFocusToken?.(token);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -372,9 +396,11 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
   return (
     <div
       ref={cardRef}
-      className={`group relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-102 hover:z-10 transition-all duration-200 token-card ${
+      className={`group relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-102 hover:z-10 transition-all duration-200 token-card cursor-pointer ${
         isDragOver && !attachedCompanion
           ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]' 
+          : isClicked
+          ? 'border-white/30 bg-white/12 scale-95 shadow-lg shadow-white/20'
           : 'border-white/10 bg-white/6'
       }`}
       style={{ willChange: 'transform', pointerEvents: 'auto' }}
@@ -383,10 +409,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       onDrop={handleDrop}
       onMouseEnter={onHoverEnter}
       onMouseLeave={onHoverLeave}
-      onClick={(e) => {
-        e.stopPropagation();
-        onFocusToken?.(token);
-      }}
+      onClick={handleCardClick}
       draggable={false}
     >
       {/* Drop indicator overlay */}
@@ -401,6 +424,30 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
             <span>Drop Companion Here</span>
           </div>
         </motion.div>
+      )}
+
+      {/* Click ripple effect */}
+      {ripplePosition && (
+        <motion.div
+          initial={{ 
+            scale: 0, 
+            opacity: 0.6,
+            x: ripplePosition.x - 20,
+            y: ripplePosition.y - 20
+          }}
+          animate={{ 
+            scale: 4, 
+            opacity: 0,
+            x: ripplePosition.x - 20,
+            y: ripplePosition.y - 20
+          }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="absolute w-10 h-10 bg-white/30 rounded-full pointer-events-none z-20"
+          style={{
+            left: 0,
+            top: 0,
+          }}
+        />
       )}
       
 
@@ -603,9 +650,7 @@ function TokenColumn({
 }) {
 
   return (
-    <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 ${className}`}>
-      <h2 className="text-white text-lg font-bold text-center flex-shrink-0">{title}</h2>
-      <div className="w-full border-b border-gray-700 mb-3 -mx-3" />
+    <div className={`flex flex-col min-w-0 flex-1 relative z-0 ${className}`}>
       <div className="rounded-2xl bg-black/15 p-4 overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6">
         <div className="flex flex-col gap-2">
           {items.length === 0 ? (
@@ -806,9 +851,7 @@ function InsightsColumn({
   const metrics = getTokenMetrics(focusToken);
 
   return (
-    <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 ${className}`}>
-      <h2 className="text-white text-lg font-bold text-center flex-shrink-0">INSIGHTS</h2>
-      <div className="w-full border-b border-gray-700 mb-3 -mx-3" />
+    <div className={`flex flex-col min-w-0 flex-1 relative z-0 ${className}`}>
       <div className="overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6">
         {!focusToken ? (
           <div className="flex items-center justify-center h-full">
@@ -1577,78 +1620,90 @@ export const Scope = ({
             </div>
           </div>
         ) : (
-          <div className="flex gap-6">
-            <TokenColumn 
-              title="FRESH MINTS" 
-              items={filteredTokens.newPairs} 
-              className="border-r border-gray-700 flex-1 min-w-0"
-                visibleMintsRef={visibleMintsRef}
-                agents={agents}
-                newTokenMint={newTokenMint}
-                attachedCompanions={attachedCompanions}
-                onCompanionDetach={handleCompanionDetach}
-                onHoverEnter={pauseLiveOnHover}
-                onHoverLeave={resumeLiveAfterHover}
-                onFocusToken={setFocusToken}
-                onCompanionAttached={(companionName, token) => {
-                  // Handle companion attachment
-                  handleCompanionAttached(companionName, token);
-                  
-                  // Simulate companion analysis
-                  
-                  // Create new conversation for token analysis
-                  const newConversation = {
-                    id: Date.now().toString(),
-                    title: `${companionName} analyzing ${token.name || token.symbol || 'token'}`,
-                    messages: [],
-                    timestamp: new Date()
-                  };
-                  setConversationHistory(prev => [newConversation, ...prev.slice(0, 19)]);
-                  
-                  // Simulate companion analyzing the token
-                  setTimeout(() => {
-                    setTypingCompanion(companionName);
-                    setIsTyping(true);
-                    
-                    // Simulate analysis time
-                    const analysisTime = 3000 + Math.random() * 2000;
-                    
-                    setTimeout(() => {
-                      setIsTyping(false);
-                      setTypingCompanion(null);
-                      
-                      // Add analysis message
-                      const analysisMessage = {
-                        type: 'assistant' as const,
-                        content: `${companionName}: I've analyzed ${token.name || token.symbol || 'this token'}. Market cap: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'This is on a bonding curve - interesting dynamics ahead!' : 'Standard token with typical market behavior.'}`,
-                        timestamp: new Date()
-                      };
-                      setMessages(prev => [analysisMessage, ...prev]);
-                      
-                      // Update conversation history
-                      if (currentConversationId) {
-                        setConversationHistory(prev => {
-                          const updated = [...prev];
-                          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
-                          
-                          if (currentConvIndex !== -1) {
-                            updated[currentConvIndex].messages = [analysisMessage];
-                          }
-                          return updated;
-                        });
-                      }
-                    }, analysisTime);
-                  }, 500);
-                }}
-              />
-              <InsightsColumn 
-                focusToken={focusToken}
+          <div className="flex flex-col">
+            {/* Shared Header Row */}
+            <div className="flex border-b border-white/10">
+              <div className="flex-1 text-center py-2">
+                <h2 className="text-xs uppercase tracking-wider text-white/70">Fresh Mints</h2>
+              </div>
+              <div className="flex-1 text-center py-2">
+                <h2 className="text-xs uppercase tracking-wider text-white/70">Insights</h2>
+              </div>
+              <div className="flex-1 text-center py-2">
+                <h2 className="text-xs uppercase tracking-wider text-white/70">Companions</h2>
+              </div>
+            </div>
+            
+            {/* Content Row */}
+            <div className="flex gap-6 mt-3">
+              <TokenColumn 
+                title="" 
+                items={filteredTokens.newPairs} 
                 className="border-r border-gray-700 flex-1 min-w-0"
-              />
-              <div className="flex flex-col flex-1 min-w-0 relative">
-                <h2 className="text-white text-lg font-bold text-center flex-shrink-0">COMPANIONS</h2>
-                <div className="w-full border-b border-gray-700 mb-3 -mx-3" />
-                
+                  visibleMintsRef={visibleMintsRef}
+                  agents={agents}
+                  newTokenMint={newTokenMint}
+                  attachedCompanions={attachedCompanions}
+                  onCompanionDetach={handleCompanionDetach}
+                  onHoverEnter={pauseLiveOnHover}
+                  onHoverLeave={resumeLiveAfterHover}
+                  onFocusToken={setFocusToken}
+                  onCompanionAttached={(companionName, token) => {
+                    // Handle companion attachment
+                    handleCompanionAttached(companionName, token);
+                    
+                    // Simulate companion analysis
+                    
+                    // Create new conversation for token analysis
+                    const newConversation = {
+                      id: Date.now().toString(),
+                      title: `${companionName} analyzing ${token.name || token.symbol || 'token'}`,
+                      messages: [],
+                      timestamp: new Date()
+                    };
+                    setConversationHistory(prev => [newConversation, ...prev.slice(0, 19)]);
+                    
+                    // Simulate companion analyzing the token
+                    setTimeout(() => {
+                      setTypingCompanion(companionName);
+                      setIsTyping(true);
+                      
+                      // Simulate analysis time
+                      const analysisTime = 3000 + Math.random() * 2000;
+                      
+                      setTimeout(() => {
+                        setIsTyping(false);
+                        setTypingCompanion(null);
+                        
+                        // Add analysis message
+                        const analysisMessage = {
+                          type: 'assistant' as const,
+                          content: `${companionName}: I've analyzed ${token.name || token.symbol || 'this token'}. Market cap: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'This is on a bonding curve - interesting dynamics ahead!' : 'Standard token with typical market behavior.'}`,
+                          timestamp: new Date()
+                        };
+                        setMessages(prev => [analysisMessage, ...prev]);
+                        
+                        // Update conversation history
+                        if (currentConversationId) {
+                          setConversationHistory(prev => {
+                            const updated = [...prev];
+                            const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
+                            
+                            if (currentConvIndex !== -1) {
+                              updated[currentConvIndex].messages = [analysisMessage];
+                            }
+                            return updated;
+                          });
+                        }
+                      }, analysisTime);
+                    }, 500);
+                  }}
+                />
+                <InsightsColumn 
+                  focusToken={focusToken}
+                  className="border-r border-gray-700 flex-1 min-w-0"
+                />
+                <div className="flex flex-col flex-1 min-w-0 relative">
                 {/* Scroll section */}
                 <div className="flex-1 overflow-y-auto">
                   <div className="flex justify-center">
@@ -1742,6 +1797,7 @@ export const Scope = ({
                   </div>
                 </div>
               </div>
+            </div>
           </div>
         )}
         
@@ -2011,6 +2067,10 @@ const ScopeWithWatchlist: React.FC<{
   live: boolean;
   resumeLive: () => void;
   pauseLive: () => void;
+  pauseLiveOnHover: () => void;
+  resumeLiveAfterHover: () => void;
+  isHoverPaused: boolean;
+  queuedTokens: any[];
   newTokenMint: string | null;
 }> = (props) => {
   return (

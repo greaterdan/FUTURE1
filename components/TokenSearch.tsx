@@ -53,6 +53,7 @@ export default function TokenSearch({ onTokenSelect, placeholder = "Search by to
 
     const searchTokens = async () => {
       setIsLoading(true);
+      setShowDropdown(true); // Show dropdown immediately when search starts
       try {
         const response = await fetch(`${SERVER_BASE_URL}/api/tokens/search?q=${encodeURIComponent(debouncedQuery)}&limit=20`);
         
@@ -62,7 +63,7 @@ export default function TokenSearch({ onTokenSelect, placeholder = "Search by to
         
         const data = await response.json();
         setResults(data.items || []);
-        setShowDropdown(data.items && data.items.length > 0);
+        setShowDropdown(true); // Always show dropdown when we have a search query
         setSelectedIndex(-1);
       } catch (error) {
         console.error('Search failed:', error);
@@ -159,6 +160,7 @@ export default function TokenSearch({ onTokenSelect, placeholder = "Search by to
     }
   };
 
+
   return (
     <div className={`relative ${className}`}>
       {/* Search Input */}
@@ -170,7 +172,9 @@ export default function TokenSearch({ onTokenSelect, placeholder = "Search by to
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (results.length > 0) setShowDropdown(true);
+            if (results.length > 0) {
+              setShowDropdown(true);
+            }
           }}
           placeholder={placeholder}
           className="w-full px-4 py-2 bg-transparent border border-white/30 rounded-full text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-200"
@@ -197,7 +201,7 @@ export default function TokenSearch({ onTokenSelect, placeholder = "Search by to
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="absolute top-full left-0 right-0 mt-2 bg-black/90 border border-white/20 rounded-lg shadow-2xl backdrop-blur-sm z-50 max-h-96 overflow-y-auto"
+            className="absolute top-full left-0 right-0 mt-2 bg-black/90 border border-white/20 rounded-lg shadow-2xl backdrop-blur-sm z-[100] max-h-96 overflow-y-auto"
           >
             {results.length === 0 && !isLoading && (
               <div className="p-4 text-center text-white/60">

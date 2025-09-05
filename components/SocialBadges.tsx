@@ -43,7 +43,7 @@ const A: React.FC<{href?: string; title: string; children: React.ReactNode}> = (
 
 export default function SocialBadges({ links, website, twitter, telegram, source }: Props) {
   // Helper function to get source platform URL
-  const getSourceUrl = (source: string, mint: string) => {
+  const getSourceUrl = (source: string | undefined, mint: string) => {
     // Check if it's a pump.fun token (mint ends with 'pump' or source is pump.fun)
     if (source === 'pump.fun' || mint.endsWith('pump')) {
       return `https://pump.fun/coin/${mint}`;
@@ -52,11 +52,11 @@ export default function SocialBadges({ links, website, twitter, telegram, source
     if (source === 'bonk.fun' || mint.endsWith('bonk')) {
       return `https://bonk.fun/token/${mint}`;
     }
-    return null;
+    return undefined;
   };
 
   // Helper function to get source platform icon
-  const getSourceIcon = (source: string, mint: string) => {
+  const getSourceIcon = (source: string | undefined, mint: string) => {
     // Check if it's a pump.fun token (mint ends with 'pump' or source is pump.fun)
     if (source === 'pump.fun' || mint.endsWith('pump')) {
       return <Flame size={14} className="text-orange-400" />;
