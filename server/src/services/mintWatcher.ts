@@ -157,6 +157,19 @@ export class MintWatcherService {
 
             logger.info(`Successfully processed mint: ${mintInfo.mint} (${mintInfo.decimals} decimals)`);
             
+            // IMMEDIATE metadata enrichment for fresh mint
+            try {
+                const metadataEnricher = require('./metadataEnricherService').metadataEnricherService;
+                if (metadataEnricher) {
+                    // Trigger immediate metadata enrichment (non-blocking)
+                    metadataEnricher.enrichTokenImmediately(mintInfo.mint).catch((error: any) => {
+                        logger.debug(`Immediate metadata enrichment failed for ${mintInfo.mint}:`, error);
+                    });
+                }
+            } catch (error) {
+                logger.debug('Metadata enricher service not available for immediate enrichment');
+            }
+            
             // Broadcast new token to all connected WebSocket clients
             if (newToken) {
                 const ws = getWsService();

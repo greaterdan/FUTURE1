@@ -63,18 +63,18 @@ export class MetadataEnricherService {
 
     logger.info("Starting Metadata Enricher Service...");
     
-    // Start cron job to enrich tokens every 5 seconds for live mint detection
-    this.cronJob = cron.schedule("*/5 * * * * *", async () => {
+    // Start cron job to enrich tokens every 1 second for ultra-fast fresh mint detection
+    this.cronJob = cron.schedule("*/1 * * * * *", async () => {
       try {
-        await this.enrichTokens(50); // Process 50 tokens at a time
-        await this.enrichSocialLinks(20); // Process 20 tokens for social links
+        await this.enrichTokens(100); // Process 100 tokens at a time for faster processing
+        await this.enrichSocialLinks(30); // Process 30 tokens for social links
       } catch (error) {
         logger.error("Error in metadata enrichment cron job:", error);
       }
     });
 
     this.isRunning = true;
-    logger.info("✅ Metadata Enricher Service started successfully");
+    logger.info("✅ Metadata Enricher Service started successfully (ULTRA-FAST MODE)");
   }
 
   async stop(): Promise<void> {
@@ -102,23 +102,20 @@ export class MetadataEnricherService {
       return;
     }
     
-    logger.info(`Enriching metadata for ${mints.length} tokens`);
+    logger.info(`🚀 ULTRA-FAST enriching metadata for ${mints.length} tokens`);
     
-    // Process in smaller batches with rate limiting to avoid overwhelming the RPC
-    const batchSize = 3; // Reduced from 10 to 3 for better rate limiting
+    // Process in larger batches with parallel processing for maximum speed
+    const batchSize = 10; // Increased for faster processing
     for (let i = 0; i < mints.length; i += batchSize) {
       const batch = mints.slice(i, i + batchSize);
       
-      // Process batch sequentially to avoid overwhelming external APIs
-      for (const mint of batch) {
-        await this.enrichToken(mint);
-        // Rate limit: max 2-3 tokens per second
-        await new Promise(resolve => setTimeout(resolve, 400));
-      }
+      // Process batch in parallel for maximum speed
+      const promises = batch.map(mint => this.enrichToken(mint));
+      await Promise.allSettled(promises);
       
-      // Additional delay between batches
+      // Minimal delay between batches to avoid overwhelming RPC
       if (i + batchSize < mints.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 100)); // Reduced from 1000ms to 100ms
       }
     }
   }
@@ -131,43 +128,58 @@ export class MetadataEnricherService {
       return;
     }
     
-    logger.info(`Enriching social links for ${mints.length} tokens`);
+    logger.info(`🚀 ULTRA-FAST enriching social links for ${mints.length} tokens`);
     
-    // Process in smaller batches with rate limiting
-    const batchSize = 2;
+    // Process in larger batches with parallel processing for maximum speed
+    const batchSize = 5; // Increased for faster processing
     for (let i = 0; i < mints.length; i += batchSize) {
       const batch = mints.slice(i, i + batchSize);
       
-      // Process batch sequentially
-      for (const mint of batch) {
-        await this.enrichSocialLinksForToken(mint);
-        // Rate limit: max 1-2 tokens per second
-        await new Promise(resolve => setTimeout(resolve, 600));
-      }
+      // Process batch in parallel for maximum speed
+      const promises = batch.map(mint => this.enrichSocialLinksForToken(mint));
+      await Promise.allSettled(promises);
       
-      // Additional delay between batches
+      // Minimal delay between batches
       if (i + batchSize < mints.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 200)); // Reduced from 1000ms to 200ms
       }
     }
   }
 
   async enrichToken(mint: string) {
-    const maxRetries = 3;
+    const maxRetries = 2; // Reduced from 3 to 2 for faster processing
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        logger.debug(`Enriching metadata for ${mint} (attempt ${attempt}/${maxRetries})`);
+        logger.debug(`🚀 ULTRA-FAST enriching metadata for ${mint} (attempt ${attempt}/${maxRetries})`);
 
-        const onchain = await getOnchainMetadata(this.conn, mint);
+        // Try both on-chain and Helius in parallel for maximum speed
+        const [onchain, helius] = await Promise.allSettled([
+          getOnchainMetadata(this.conn, mint),
+          this.tryHeliusFallback(mint)
+        ]);
 
-        if (onchain.name || onchain.symbol || onchain.uri) {
+        const onchainResult = onchain.status === 'fulfilled' ? onchain.value : {};
+        const heliusResult = helius.status === 'fulfilled' ? helius.value : {};
+
+        // Use on-chain data first, fallback to Helius
+        const metadata = {
+          name: onchainResult.name || heliusResult.name,
+          symbol: onchainResult.symbol || heliusResult.symbol,
+          uri: onchainResult.uri || heliusResult.uri,
+          image: onchainResult.image || heliusResult.image
+        };
+
+        if (metadata.name || metadata.symbol || metadata.uri) {
           const update: any = {};
-          const nm = clean(onchain.name);
-          const sy = clean(onchain.symbol);
-          const ur = clean(onchain.uri);
+          const nm = clean(metadata.name);
+          const sy = clean(metadata.symbol);
+          const ur = clean(metadata.uri);
+          const im = clean(metadata.image);
+          
           if (nm) update.name = nm;
           if (sy) update.symbol = sy;
           if (ur) update.metadata_uri = ur;
+          if (im) update.image_url = im;
 
           if (Object.keys(update).length) {
             // Check if this is an unwanted token and skip processing
@@ -177,68 +189,25 @@ export class MetadataEnricherService {
             }
             
             await this.repo.updateTokenMetadataByMint(mint, update);
-            logger.info(`✅ Metadata enriched: ${nm || 'Unknown'} (${sy || 'Unknown'}) from ${ur || 'on-chain'}`);
+            logger.info(`✅ ULTRA-FAST metadata enriched: ${nm || 'Unknown'} (${sy || 'Unknown'})`);
           }
 
-          // Always try to extract social links if we have a metadata URI
-          let socialData = ur ? await this.extractSocialLinks(ur).catch(() => undefined) : undefined;
-
-          // Resolve image (try off-chain JSON first)
-          let img = ur ? await resolveImageUrl(ur).catch(() => undefined) : undefined;
-
-          // If still nothing, ask Helius just for the image
-          if (!img) {
-            const hel = await this.tryHeliusFallback(mint);
-            img = clean(hel.image);
+          // Try to get additional data in parallel (non-blocking)
+          if (ur) {
+            Promise.allSettled([
+              this.extractSocialLinks(ur).then(socialData => {
+                if (socialData && Object.keys(socialData).length > 0) {
+                  return this.repo.updateTokenMetadataByMint(mint, socialData);
+                }
+              }),
+              resolveImageUrl(ur).then(img => {
+                if (img) {
+                  return this.repo.updateTokenMetadataByMint(mint, { image_url: img });
+                }
+              })
+            ]).catch(() => {}); // Ignore errors for non-critical data
           }
 
-          const updateData: any = {};
-          if (img) {
-            updateData.image_url = img;
-            logger.debug(`🖼️  Image set for ${mint}: ${img}`);
-          }
-
-          // Add social links if found
-          if (socialData) {
-            if (socialData.website) updateData.website = socialData.website;
-            if (socialData.twitter) updateData.twitter = socialData.twitter;
-            if (socialData.telegram) updateData.telegram = socialData.telegram;
-            if (socialData.source) updateData.source = socialData.source;
-            logger.debug(`🔗 Social links extracted for ${mint}:`, socialData);
-          }
-
-          if (Object.keys(updateData).length > 0) {
-            await this.repo.updateTokenMetadataByMint(mint, updateData);
-          }
-
-          return;
-        }
-
-        // No usable on-chain md → Helius
-        logger.debug(`No on-chain metadata found for ${mint}, trying Helius fallback...`);
-        const hel = await this.tryHeliusFallback(mint);
-
-        if (hel.name || hel.symbol || hel.uri || hel.image) {
-          const update: any = {};
-          const nm = clean(hel.name);
-          const sy = clean(hel.symbol);
-          const ur = clean(hel.uri);
-          const im = clean(hel.image);
-          if (nm) update.name = nm;
-          if (sy) update.symbol = sy;
-          if (ur) update.metadata_uri = ur;
-          if (im) update.image_url = im;
-
-          if (Object.keys(update).length) {
-            // Check if this is an unwanted token and skip processing
-            if (isUnwantedToken(nm, sy)) {
-              logger.info(`🚫 Unwanted token detected via Helius, skipping: ${nm || 'Unknown'} (${sy || 'Unknown'})`);
-              return;
-            }
-            
-            await this.repo.updateTokenMetadataByMint(mint, update);
-            logger.info(`✅ Metadata enriched via Helius fallback: ${nm || 'Unknown'} (${sy || 'Unknown'})`);
-          }
           return;
         }
 
@@ -250,9 +219,23 @@ export class MetadataEnricherService {
           logger.error(`Failed to enrich token ${mint} after ${maxRetries} attempts:`, error);
         } else {
           logger.warn(`⚠️ Metadata enrichment failed for ${mint} (attempt ${attempt}/${maxRetries}), retrying...`);
-          await new Promise(r => setTimeout(r, Math.pow(2, attempt - 1) * 1000));
+          await new Promise(r => setTimeout(r, Math.pow(2, attempt - 1) * 500)); // Reduced retry delay
         }
       }
+    }
+  }
+
+  // IMMEDIATE metadata enrichment for fresh mints - called when new tokens are detected
+  async enrichTokenImmediately(mint: string): Promise<void> {
+    try {
+      logger.info(`🔥 IMMEDIATE metadata enrichment for fresh mint: ${mint}`);
+      
+      // Use the same optimized enrichment logic but with immediate processing
+      await this.enrichToken(mint);
+      
+      logger.info(`✅ IMMEDIATE metadata enrichment completed for: ${mint}`);
+    } catch (error) {
+      logger.error(`Failed immediate metadata enrichment for ${mint}:`, error);
     }
   }
 
@@ -276,15 +259,15 @@ export class MetadataEnricherService {
     }
   }
 
-  // Extract social links and source platform from metadata JSON
+  // Extract social links and source platform from metadata JSON - OPTIMIZED FOR SPEED
   private async extractSocialLinks(metadataUri: string): Promise<{ website?: string; twitter?: string; telegram?: string; source?: string }> {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced timeout from 10s to 5s
       
       const response = await fetch(metadataUri, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; TokenTracker/1.0)',
+          'User-Agent': 'TokenTracker/2.0',
         },
         signal: controller.signal
       });
@@ -313,12 +296,6 @@ export class MetadataEnricherService {
         }
       }
       
-      // Also check if the mint address ends with 'pump' (pump.fun tokens)
-      if (!result.source && metadata.name) {
-        // This is a fallback - if we can't determine from createdOn, we'll let the frontend handle it
-        // based on the mint address pattern
-      }
-      
       return result;
     } catch (error) {
       logger.debug(`Failed to extract social links from ${metadataUri}:`, error);
@@ -326,7 +303,7 @@ export class MetadataEnricherService {
     }
   }
   
-  // Helius fallback for tokens with invalid on-chain metadata
+  // Helius fallback for tokens with invalid on-chain metadata - OPTIMIZED FOR SPEED
   private async tryHeliusFallback(mint: string): Promise<{ name?: string; symbol?: string; uri?: string; image?: string }> {
     const apiKey = process.env.HELIUS_API_KEY || process.env.HELIUS_KEY || "";
     if (!apiKey) {
@@ -334,16 +311,26 @@ export class MetadataEnricherService {
       return {};
     }
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced timeout from 10s to 5s
+      
       const resp = await fetch(`https://mainnet.helius-rpc.com/?api-key=${apiKey}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "User-Agent": "TokenTracker/2.0"
+        },
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: "get-asset",
           method: "getAsset",
           params: { id: mint }
-        })
+        }),
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+      
       if (!resp.ok) return {};
       const { result } = await resp.json() as any;
 

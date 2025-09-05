@@ -54,10 +54,15 @@ async function safeFetchJson(uri: string): Promise<any | null> {
   if (!normalized) return null;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
+  const timeout = setTimeout(() => controller.abort(), 5000); // Reduced timeout from 10s to 5s for speed
 
   try {
-    const res = await fetch(normalized, { signal: controller.signal });
+    const res = await fetch(normalized, { 
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'TokenTracker/2.0'
+      }
+    });
     if (!res.ok) return null;
 
     const ct = res.headers.get("content-type") || "";
