@@ -7,7 +7,11 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      scale: {
+        '102': '1.02',
+      },
+    },
   },
   plugins: [],
 };

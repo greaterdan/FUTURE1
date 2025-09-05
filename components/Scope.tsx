@@ -302,8 +302,9 @@ type CardProps = {
   onCompanionDetach?: (tokenMint: string) => void;
   onHoverEnter?: () => void;
   onHoverLeave?: () => void;
+  onFocusToken?: (token: any) => void;
 };
-const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach, onHoverEnter, onHoverLeave }) => {
+const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach, onHoverEnter, onHoverLeave, onFocusToken }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
   const [isDragOver, setIsDragOver] = useState(false);
   
@@ -371,7 +372,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
   return (
     <div
       ref={cardRef}
-      className={`group relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-105 hover:z-10 transition-all duration-200 token-card ${
+      className={`group relative isolate overflow-visible rounded-xl border p-4 shadow-sm hover:scale-102 hover:z-10 transition-all duration-200 token-card ${
         isDragOver && !attachedCompanion
           ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/30 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse shadow-[0_0_20px_rgba(59,130,246,0.5)]' 
           : 'border-white/10 bg-white/6'
@@ -382,6 +383,10 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       onDrop={handleDrop}
       onMouseEnter={onHoverEnter}
       onMouseLeave={onHoverLeave}
+      onClick={(e) => {
+        e.stopPropagation();
+        onFocusToken?.(token);
+      }}
       draggable={false}
     >
       {/* Drop indicator overlay */}
@@ -580,7 +585,8 @@ function TokenColumn({
   attachedCompanions,
   onCompanionDetach,
   onHoverEnter,
-  onHoverLeave
+  onHoverLeave,
+  onFocusToken
 }: { 
   title: string; 
   items: any[]; 
@@ -593,6 +599,7 @@ function TokenColumn({
   onCompanionDetach?: (tokenMint: string) => void;
   onHoverEnter?: () => void;
   onHoverLeave?: () => void;
+  onFocusToken?: (token: any) => void;
 }) {
 
   return (
@@ -639,6 +646,7 @@ function TokenColumn({
                           onCompanionDetach={onCompanionDetach}
                           onHoverEnter={onHoverEnter}
                           onHoverLeave={onHoverLeave}
+                          onFocusToken={onFocusToken}
                         />
                       </motion.div>
                     ) : (
@@ -651,6 +659,7 @@ function TokenColumn({
                         onCompanionDetach={onCompanionDetach}
                         onHoverEnter={onHoverEnter}
                         onHoverLeave={onHoverLeave}
+                        onFocusToken={onFocusToken}
                       />
                     )}
                   </div>
@@ -659,6 +668,354 @@ function TokenColumn({
             </>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// InsightCard Component
+function InsightCard({ 
+  title, 
+  icon, 
+  children, 
+  className = "" 
+}: { 
+  title: string; 
+  icon: React.ReactNode; 
+  children: React.ReactNode; 
+  className?: string; 
+}) {
+  return (
+    <div className={`group rounded-2xl bg-white/[0.04] border border-white/10 hover:bg-white/[0.06] hover:border-white/15 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] transition-all duration-200 hover:-translate-y-0.5 px-4 py-3 desktop:px-4 desktop:py-3 px-3 py-2 mr-2 ${className}`}>
+      {/* Header row */}
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
+        <h3 className="uppercase tracking-wider text-[11px] text-white/70 font-mono">{title}</h3>
+      </div>
+      <div className="border-b border-white/10 -mx-4 mt-2 mb-3" />
+      {children}
+    </div>
+  );
+}
+
+// ConfidenceBar Component
+function ConfidenceBar({ 
+  value, 
+  className = "" 
+}: { 
+  value: number; 
+  className?: string; 
+}) {
+  const clampedValue = Math.min(Math.max(value, 0), 100);
+  const color = clampedValue > 70 ? 'bg-green-400' : clampedValue > 40 ? 'bg-yellow-400' : 'bg-red-400';
+  
+  return (
+    <div className={`flex items-center gap-2 ${className}`}>
+      <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+        <div 
+          className={`h-full ${color} transition-all duration-300`}
+          style={{ width: `${clampedValue}%` }}
+        />
+      </div>
+      <span className="text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-white/5 text-white/80">
+        {clampedValue}%
+      </span>
+    </div>
+  );
+}
+
+// Insights Column Component
+function InsightsColumn({ 
+  focusToken,
+  className = ""
+}: { 
+  focusToken: any | null;
+  className?: string;
+}) {
+  // Helper function to format values with fallbacks
+  const formatValue = (value: any, fallback: string = "N/A") => {
+    if (value === null || value === undefined || value === 'null' || value === '0') {
+      return fallback;
+    }
+    return value;
+  };
+
+  // Helper function to clamp values
+  const clamp = (value: number, min: number, max: number) => {
+    return Math.min(Math.max(value, min), max);
+  };
+
+  // Calculate metrics
+  const getTokenMetrics = (token: any) => {
+    if (!token) return null;
+
+    const confidence = clamp(token.confidence ?? token.confidenceScore ?? 50, 0, 100);
+    const marketcap = formatValue(token.marketcap, "N/A");
+    const liquidity = formatValue(token.liquidity, "N/A");
+    const volume24h = formatValue(token.volume_24h, "N/A");
+    const holderCount = formatValue(token.holder_count ?? token.holders, "N/A");
+    
+    // Calculate token age (simplified)
+    const createdAt = token.created_at || token.createdAt;
+    const tokenAge = createdAt ? Math.floor((Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)) : "N/A";
+    
+    // Calculate 10m and 1h moves (simplified - would need price history in real implementation)
+    const price10mMove = "N/A"; // Would need price history
+    const price1hMove = "N/A"; // Would need price history
+    
+    // Calculate expected range (simplified)
+    const expectedRange = "±3%"; // Fallback as specified
+    
+    // Calculate up probability based on confidence
+    const upProbability = clamp(confidence, 0, 100);
+    
+    // Calculate future-echo delta (simplified)
+    const futureEchoDelta = "N/A"; // Would need EMA calculation
+    
+    // Determine scenario bias
+    const scenarioBias = confidence > 60 ? "Up" : confidence < 40 ? "Down" : "Neutral";
+    
+    // Calculate momentum metrics (simplified)
+    const priceMomentum = "N/A"; // Would need SMA calculation
+    const volumeMomentum = "N/A"; // Would need volume history
+    const acceleration = "N/A"; // Would need trend analysis
+    
+    // Determine heating/cooling
+    const heatingCooling = confidence > 70 ? "High" : confidence > 40 ? "Med" : "Low";
+
+    return {
+      confidence,
+      marketcap,
+      liquidity,
+      volume24h,
+      holderCount,
+      tokenAge,
+      price10mMove,
+      price1hMove,
+      expectedRange,
+      upProbability,
+      futureEchoDelta,
+      scenarioBias,
+      priceMomentum,
+      volumeMomentum,
+      acceleration,
+      heatingCooling
+    };
+  };
+
+  const metrics = getTokenMetrics(focusToken);
+
+  return (
+    <div className={`flex flex-col gap-3 min-w-0 flex-1 relative z-0 ${className}`}>
+      <h2 className="text-white text-lg font-bold text-center flex-shrink-0">INSIGHTS</h2>
+      <div className="w-full border-b border-gray-700 mb-3 -mx-3" />
+      <div className="overflow-y-auto overflow-x-visible h-[calc(100vh-180px)] max-h-[calc(100vh-180px)] pb-6">
+        {!focusToken ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
+              Click on a token to see insights
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {/* Selected Token Card */}
+            <div className="rounded-2xl bg-white/[0.04] border border-white/10 p-3 shadow-[0_0_0_1px_rgba(255,255,255,0.03)] mr-2">
+              <div className="flex items-center gap-3">
+                {/* Token Avatar */}
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
+                  {focusToken.imageUrl ? (
+                    <img 
+                      src={`http://localhost:8080/api/img?u=${encodeURIComponent(focusToken.imageUrl)}`}
+                      alt={focusToken.symbol || focusToken.name || "Token"}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold">
+                      {(focusToken.symbol || focusToken.name || "T").slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Token Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-white/80 text-sm font-mono font-bold uppercase">
+                      {focusToken.symbol || focusToken.mint.slice(0, 4)}
+                    </span>
+                    <span className="text-white text-sm font-medium truncate">
+                      {focusToken.name || focusToken.symbol || `${focusToken.mint.slice(0, 4)}…${focusToken.mint.slice(-4)}`}
+                    </span>
+                  </div>
+                  <div className="text-white/50 text-xs font-mono">
+                    {focusToken.mint.slice(0, 8)}...{focusToken.mint.slice(-8)}
+                  </div>
+                </div>
+                
+                {/* Status Badge */}
+                <div className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-mono border ${
+                  focusToken.is_on_curve || focusToken.status === 'curve'
+                    ? 'bg-purple-500/15 text-purple-300 border-purple-500/30'
+                    : 'bg-green-500/15 text-green-300 border-green-500/30'
+                }`}>
+                  {focusToken.is_on_curve || focusToken.status === 'curve' ? 'CURVE' : 'ACTIVE'}
+                </div>
+              </div>
+            </div>
+
+            {/* Insights Section */}
+            <InsightCard 
+              title="Insights" 
+              icon={
+                <svg className="w-3 h-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              }
+            >
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Confidence</div>
+                  <ConfidenceBar value={metrics?.confidence || 0} />
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Marketcap</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.marketcap || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Liquidity</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.liquidity || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">24h Vol</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.volume24h || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Holders</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.holderCount || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Age</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.tokenAge || "N/A"}</div>
+                </div>
+              </div>
+            </InsightCard>
+
+            {/* Forecast Section */}
+            <InsightCard 
+              title="Forecast" 
+              icon={
+                <svg className="w-3 h-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              }
+            >
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">10m move</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.price10mMove || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">1h move</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.price1hMove || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Expected range</div>
+                  <div className="text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-white/5 text-white/80">
+                    {metrics?.expectedRange || "N/A"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Up prob</div>
+                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-mono border ${
+                    metrics?.upProbability && metrics.upProbability > 60 
+                      ? 'bg-green-500/15 text-green-300 border-green-500/30' 
+                      : metrics?.upProbability && metrics.upProbability > 40 
+                        ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30' 
+                        : 'bg-red-500/15 text-red-300 border-red-500/30'
+                  }`}>
+                    {metrics?.upProbability || "N/A"}%
+                  </div>
+                </div>
+              </div>
+            </InsightCard>
+
+            {/* Retrocausality Section */}
+            <InsightCard 
+              title="Retrocausality" 
+              icon={
+                <svg className="w-3 h-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              }
+            >
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Future-echo Δ</div>
+                  <div className="text-white text-[12px] font-mono flex items-center gap-1">
+                    {metrics?.futureEchoDelta && metrics.futureEchoDelta !== "N/A" ? (
+                      <>
+                        <span className={parseFloat(metrics.futureEchoDelta) > 0 ? 'text-green-400' : 'text-red-400'}>
+                          {parseFloat(metrics.futureEchoDelta) > 0 ? '▲' : '▼'}
+                        </span>
+                        {metrics.futureEchoDelta}
+                      </>
+                    ) : (
+                      "N/A"
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Scenario bias</div>
+                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-mono border ${
+                    metrics?.scenarioBias === 'Up' 
+                      ? 'bg-green-500/15 text-green-300 border-green-500/30' 
+                      : metrics?.scenarioBias === 'Down' 
+                        ? 'bg-red-500/15 text-red-300 border-red-500/30' 
+                        : 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30'
+                  }`}>
+                    {metrics?.scenarioBias || "N/A"}
+                  </div>
+                </div>
+              </div>
+            </InsightCard>
+
+            {/* Momentum Section */}
+            <InsightCard 
+              title="Momentum" 
+              icon={
+                <svg className="w-3 h-3 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              }
+            >
+              <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Price momentum</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.priceMomentum || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Volume momentum</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.volumeMomentum || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Acceleration</div>
+                  <div className="text-white text-[12px] font-mono">{metrics?.acceleration || "N/A"}</div>
+                </div>
+                <div>
+                  <div className="text-white/50 text-[12px] font-mono mb-1">Heating/Cooling</div>
+                  <div className={`inline-flex items-center px-2 py-1 rounded-full text-[11px] font-mono border ${
+                    metrics?.heatingCooling === 'High' 
+                      ? 'bg-red-500/15 text-red-300 border-red-500/30' 
+                      : metrics?.heatingCooling === 'Med' 
+                        ? 'bg-yellow-500/15 text-yellow-300 border-yellow-500/30' 
+                        : 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                  }`}>
+                    {metrics?.heatingCooling === 'High' ? 'Hot' : metrics?.heatingCooling === 'Med' ? 'Med' : metrics?.heatingCooling === 'Low' ? 'Cool' : 'N/A'}
+                  </div>
+                </div>
+              </div>
+            </InsightCard>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -702,6 +1059,9 @@ export const Scope = ({
   
   // Track companion attachments globally to persist across re-renders
   const [attachedCompanions, setAttachedCompanions] = useState<Record<string, string>>({});
+  
+  // Focused token for insights
+  const [focusToken, setFocusToken] = useState<any|null>(null);
   
   
   // Handle companion attachment
@@ -1229,6 +1589,7 @@ export const Scope = ({
                 onCompanionDetach={handleCompanionDetach}
                 onHoverEnter={pauseLiveOnHover}
                 onHoverLeave={resumeLiveAfterHover}
+                onFocusToken={setFocusToken}
                 onCompanionAttached={(companionName, token) => {
                   // Handle companion attachment
                   handleCompanionAttached(companionName, token);
@@ -1280,68 +1641,9 @@ export const Scope = ({
                   }, 500);
                 }}
               />
-              <TokenColumn 
-                title="ON EDGE" 
-                items={filteredTokens.onEdge} 
+              <InsightsColumn 
+                focusToken={focusToken}
                 className="border-r border-gray-700 flex-1 min-w-0"
-                visibleMintsRef={visibleMintsRef}
-                agents={agents}
-                newTokenMint={newTokenMint}
-                attachedCompanions={attachedCompanions}
-                onCompanionDetach={handleCompanionDetach}
-                onHoverEnter={pauseLiveOnHover}
-                onHoverLeave={resumeLiveAfterHover}
-                onCompanionAttached={(companionName, token) => {
-                  // Handle companion attachment
-                  handleCompanionAttached(companionName, token);
-                  
-                  // Simulate companion analysis
-                  
-                  // Create new conversation for token analysis
-                  const newConversation = {
-                    id: Date.now().toString(),
-                    title: `${companionName} analyzing ${token.name || token.symbol || 'token'}`,
-                    messages: [],
-                    timestamp: new Date()
-                  };
-                  setConversationHistory(prev => [newConversation, ...prev.slice(0, 19)]);
-                  setCurrentConversationId(newConversation.id);
-                  
-                  // Simulate companion analyzing the token
-                  setTimeout(() => {
-                    setTypingCompanion(companionName);
-                    setIsTyping(true);
-                    
-                    // Simulate analysis time
-                    const analysisTime = 3000 + Math.random() * 2000;
-                    
-                    setTimeout(() => {
-                      setIsTyping(false);
-                      setTypingCompanion(null);
-                      
-                      // Add analysis message
-                      const analysisMessage = {
-                        type: 'assistant' as const,
-                        content: `${companionName}: I've analyzed ${token.name || token.symbol || 'this token'}. Market cap: ${token.marketcap ? `$${token.marketcap.toLocaleString()}` : 'N/A'}, Price: ${token.price_usd ? `$${token.price_usd.toFixed(8)}` : 'N/A'}. ${token.is_on_curve ? 'This is on a bonding curve - interesting dynamics ahead!' : 'Standard token with typical market behavior.'}`,
-                        timestamp: new Date()
-                      };
-                      setMessages(prev => [analysisMessage, ...prev]);
-                      
-                      // Update conversation history
-                      if (currentConversationId) {
-                        setConversationHistory(prev => {
-                          const updated = [...prev];
-                          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
-                          
-                          if (currentConvIndex !== -1) {
-                            updated[currentConvIndex].messages = [analysisMessage];
-                          }
-                          return updated;
-                        });
-                      }
-                    }, analysisTime);
-                  }, 500);
-                }}
               />
               <div className="flex flex-col flex-1 min-w-0 relative">
                 <h2 className="text-white text-lg font-bold text-center flex-shrink-0">COMPANIONS</h2>

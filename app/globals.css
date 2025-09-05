@@ -152,7 +152,7 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
 /* Ensure hovered cards appear above other content */
 .scope-container .token-card:hover {
   z-index: 10 !important;
-  transform: scale(1.05) !important;
+  transform: scale(1.02) !important;
 }
 
 /* Ensure proper stacking context for columns */
