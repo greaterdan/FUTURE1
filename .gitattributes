@@ -1,4 +1,0 @@
-quantum-geometry/public/*.mp4 filter=lfs diff=lfs merge=lfs -text
-quantum-geometry/public/*.webm filter=lfs diff=lfs merge=lfs -text
-quantum-geometry/public/zodiac/*.webm filter=lfs diff=lfs merge=lfs -text
-*.mp4 filter=lfs diff=lfs merge=lfs -text
