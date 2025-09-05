@@ -199,11 +199,13 @@ export class MetadataEnricherService {
                 if (socialData && Object.keys(socialData).length > 0) {
                   return this.repo.updateTokenMetadataByMint(mint, socialData);
                 }
+                return null;
               }),
               resolveImageUrl(ur).then(img => {
                 if (img) {
                   return this.repo.updateTokenMetadataByMint(mint, { image_url: img });
                 }
+                return null;
               })
             ]).catch(() => {}); // Ignore errors for non-critical data
           }

@@ -18,7 +18,6 @@ class DatabaseConnection {
             min: 5,
             idleTimeoutMillis: 30000,
             connectionTimeoutMillis: 5000,
-            acquireTimeoutMillis: 10000,
             allowExitOnIdle: false,
         });
 
@@ -97,7 +96,6 @@ class DatabaseConnection {
             min: 5,
             idleTimeoutMillis: 30000,
             connectionTimeoutMillis: 5000,
-            acquireTimeoutMillis: 10000,
             allowExitOnIdle: false,
         });
         

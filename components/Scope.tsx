@@ -462,13 +462,23 @@ type CardProps = {
   onHoverLeave?: () => void;
   onFocusToken?: (token: any) => void;
   onDragTargetChange?: (token: any | null) => void;
+  draggedAgent?: string | null;
 };
-const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach, onHoverEnter, onHoverLeave, onFocusToken, onDragTargetChange }) => {
+const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach, onHoverEnter, onHoverLeave, onFocusToken, onDragTargetChange, draggedAgent }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isClicked, setIsClicked] = useState(false);
   const [ripplePosition, setRipplePosition] = useState<{ x: number; y: number } | null>(null);
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+      }
+    };
+  }, []);
   
   const copyMintAddress = async () => {
     try {
@@ -500,18 +510,43 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     onFocusToken?.(token);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
-    console.log('Drag over token:', token.mint, 'Attached companion:', attachedCompanion);
+    console.log('Drag enter token:', token.mint, 'Attached companion:', attachedCompanion, 'Dragged agent:', draggedAgent);
     
     setIsDragOver(true);
     onDragTargetChange?.(token);
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    // Keep the drag over state active while dragging over the card
+    if (!isDragOver) {
+      setIsDragOver(true);
+      onDragTargetChange?.(token);
+    }
+  };
+
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragOver(false);
-    onDragTargetChange?.(null);
+    
+    // Clear any existing timeout
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+    }
+    
+    // Debounce the drag leave to prevent flickering
+    dragTimeoutRef.current = setTimeout(() => {
+      // Only set drag over to false if we're actually leaving the card
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX;
+      const y = e.clientY;
+      
+      if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        setIsDragOver(false);
+        onDragTargetChange?.(null);
+      }
+    }, 50);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -521,16 +556,6 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
     const agentName = e.dataTransfer.getData('text/plain');
     
     if (agentName) {
-      
-      // Add a success animation
-      const card = e.currentTarget as HTMLElement;
-      card.style.transform = 'scale(1.05)';
-      card.style.transition = 'transform 0.2s ease-out';
-      
-      setTimeout(() => {
-        card.style.transform = 'scale(1)';
-      }, 200);
-      
       // Notify parent component about companion attachment (this will replace existing companion)
       if (onCompanionAttached) {
         onCompanionAttached(agentName, token);
@@ -550,12 +575,21 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
         isDragOver
           ? attachedCompanion
             ? 'border-orange-400 bg-orange-500/20 scale-105 z-20 ring-2 ring-orange-400/50 animate-pulse'
+            : draggedAgent === 'The Quantum Eraser'
+            ? 'border-[#637e9a] bg-[#637e9a]/20 scale-105 z-20 ring-2 ring-[#637e9a]/50 animate-pulse'
+            : draggedAgent === 'The Predictor'
+            ? 'border-[#3ff600] bg-[#3ff600]/20 scale-105 z-20 ring-2 ring-[#3ff600]/50 animate-pulse'
+            : draggedAgent === 'The Analyzer'
+            ? 'border-[#195c8e] bg-[#195c8e]/20 scale-105 z-20 ring-2 ring-[#195c8e]/50 animate-pulse'
+            : draggedAgent === 'The Retrocasual'
+            ? 'border-[#a95109] bg-[#a95109]/20 scale-105 z-20 ring-2 ring-[#a95109]/50 animate-pulse'
             : 'border-blue-400 bg-blue-500/20 scale-105 z-20 ring-2 ring-blue-400/50 animate-pulse'
           : isClicked
           ? 'border-white/30 bg-white/12 scale-95'
           : 'border-white/10 bg-white/6'
       }`}
       style={{ willChange: 'transform', pointerEvents: 'auto' }}
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -573,11 +607,29 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           className={`absolute inset-0 rounded-xl border-2 border-dashed flex items-center justify-center z-10 backdrop-blur-sm ${
             attachedCompanion
               ? 'bg-gradient-to-br from-orange-500/20 to-red-500/20 border-orange-400/60'
+              : draggedAgent === 'The Quantum Eraser'
+              ? 'bg-gradient-to-br from-[#637e9a]/20 to-[#637e9a]/30 border-[#637e9a]/60'
+              : draggedAgent === 'The Predictor'
+              ? 'bg-gradient-to-br from-[#3ff600]/20 to-[#3ff600]/30 border-[#3ff600]/60'
+              : draggedAgent === 'The Analyzer'
+              ? 'bg-gradient-to-br from-[#195c8e]/20 to-[#195c8e]/30 border-[#195c8e]/60'
+              : draggedAgent === 'The Retrocasual'
+              ? 'bg-gradient-to-br from-[#a95109]/20 to-[#a95109]/30 border-[#a95109]/60'
               : 'bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-blue-400/60'
           }`}
         >
           <div className={`text-sm font-medium flex items-center space-x-2 bg-black/50 px-3 py-2 rounded-lg ${
-            attachedCompanion ? 'text-orange-400' : 'text-blue-400'
+            attachedCompanion 
+              ? 'text-orange-400' 
+              : draggedAgent === 'The Quantum Eraser'
+              ? 'text-[#637e9a]'
+              : draggedAgent === 'The Predictor'
+              ? 'text-[#3ff600]'
+              : draggedAgent === 'The Analyzer'
+              ? 'text-[#195c8e]'
+              : draggedAgent === 'The Retrocasual'
+              ? 'text-[#a95109]'
+              : 'text-blue-400'
           }`}>
             <span>{attachedCompanion ? 'Switch Companion' : 'Drop Companion Here'}</span>
           </div>
@@ -764,7 +816,8 @@ const shallowPickEq = (a: any, b: any) =>
 
 export const TokenCard = React.memo(TokenCardBase, (prev, next) =>
   shallowPickEq(prev.token, next.token) &&
-  prev.attachedCompanion === next.attachedCompanion
+  prev.attachedCompanion === next.attachedCompanion &&
+  prev.draggedAgent === next.draggedAgent
 );
 
 // Token Column
@@ -781,7 +834,8 @@ function TokenColumn({
   onHoverEnter,
   onHoverLeave,
   onFocusToken,
-  onDragTargetChange
+  onDragTargetChange,
+  draggedAgent
 }: { 
   title: string; 
   items: any[]; 
@@ -796,6 +850,7 @@ function TokenColumn({
   onHoverLeave?: () => void;
   onFocusToken?: (token: any) => void;
   onDragTargetChange?: (token: any | null) => void;
+  draggedAgent?: string | null;
 }) {
 
   return (
@@ -842,6 +897,7 @@ function TokenColumn({
                           onHoverLeave={onHoverLeave}
                           onFocusToken={onFocusToken}
                           onDragTargetChange={onDragTargetChange}
+                          draggedAgent={draggedAgent}
                         />
                       </motion.div>
                     ) : (
@@ -856,6 +912,7 @@ function TokenColumn({
                         onHoverLeave={onHoverLeave}
                         onFocusToken={onFocusToken}
                         onDragTargetChange={onDragTargetChange}
+                        draggedAgent={draggedAgent}
                       />
                     )}
                   </div>
@@ -1865,6 +1922,7 @@ export const Scope = ({
                   onHoverLeave={resumeLiveAfterHover}
                   onFocusToken={setFocusToken}
                   onDragTargetChange={setDragTargetToken}
+                  draggedAgent={draggedAgent}
                   onCompanionAttached={(companionName, token) => {
                     // Handle companion attachment
                     handleCompanionAttached(companionName, token);
@@ -1930,6 +1988,14 @@ export const Scope = ({
                     className={`mx-3 mt-3 mb-3 p-2 rounded-lg ${
                       attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
                         ? 'bg-orange-500/10 border border-orange-500/30'
+                        : draggedAgent === 'The Quantum Eraser'
+                        ? 'bg-[#637e9a]/10 border border-[#637e9a]/30'
+                        : draggedAgent === 'The Predictor'
+                        ? 'bg-[#3ff600]/10 border border-[#3ff600]/30'
+                        : draggedAgent === 'The Analyzer'
+                        ? 'bg-[#195c8e]/10 border border-[#195c8e]/30'
+                        : draggedAgent === 'The Retrocasual'
+                        ? 'bg-[#a95109]/10 border border-[#a95109]/30'
                         : 'bg-blue-500/10 border border-blue-500/30'
                     }`}
                   >
@@ -1954,6 +2020,14 @@ export const Scope = ({
                         <div className={`text-sm truncate ${
                           attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
                             ? 'text-orange-300'
+                            : draggedAgent === 'The Quantum Eraser'
+                            ? 'text-[#637e9a]'
+                            : draggedAgent === 'The Predictor'
+                            ? 'text-[#3ff600]'
+                            : draggedAgent === 'The Analyzer'
+                            ? 'text-[#195c8e]'
+                            : draggedAgent === 'The Retrocasual'
+                            ? 'text-[#a95109]'
                             : 'text-blue-300'
                         }`}>
                           {dragTargetToken.mint.slice(0, 6)}...{dragTargetToken.mint.slice(-6)}
@@ -1962,6 +2036,14 @@ export const Scope = ({
                       <div className={`text-sm font-medium ${
                         attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
                           ? 'text-orange-400'
+                          : draggedAgent === 'The Quantum Eraser'
+                          ? 'text-[#637e9a]'
+                          : draggedAgent === 'The Predictor'
+                          ? 'text-[#3ff600]'
+                          : draggedAgent === 'The Analyzer'
+                          ? 'text-[#195c8e]'
+                          : draggedAgent === 'The Retrocasual'
+                          ? 'text-[#a95109]'
                           : 'text-blue-400'
                       }`}>
                         {attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint ? 'Switch' : 'Target'}
@@ -2027,7 +2109,7 @@ export const Scope = ({
                       return !attachedCompanion || attachedCompanion.name !== agent.name;
                     }).map((agent, index) => (
                       <div
-                        key={index}
+                        key={agent.name}
                         draggable={true}
                         className={`relative w-20 h-20 rounded-full cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110 ${
                           draggedAgent === agent.name ? 'opacity-0 pointer-events-none' : 'opacity-100'
@@ -2045,16 +2127,15 @@ export const Scope = ({
                           e.dataTransfer.effectAllowed = 'copy';
                           setIsDragging(true);
                           setDraggedAgent(agent.name);
+                          console.log('Set draggedAgent to:', agent.name);
                         }}
                         onDragEnd={(e) => {
                           console.log('DRAG END:', agent.name);
-                          // Reset the drag state
+                          // Reset the drag state immediately
                           setIsDragging(false);
                           setDraggedAgent(null);
-                          // Clear drag target after a short delay to allow drop handler to run first
-                          setTimeout(() => {
-                            setDragTargetToken(null);
-                          }, 100);
+                          // Clear drag target immediately - no need for delay
+                          setDragTargetToken(null);
                         }}
                       >
                         <video 
