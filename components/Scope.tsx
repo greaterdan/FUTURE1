@@ -1753,10 +1753,10 @@ export const Scope = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   
-  // Function to scroll to bottom
+  // Function to scroll to bottom (for messenger-style chat)
   const scrollToBottom = useCallback(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, []);
 
@@ -2324,7 +2324,7 @@ export const Scope = ({
                       msOverflowStyle: 'none'
                     }}
                   >
-                    <div className="flex flex-col min-h-full p-4 pb-2 relative">
+                    <div className="flex flex-col justify-end min-h-full p-4 pb-2 relative">
                       {messages.length === 0 && !isDragging && !draggedAgent ? (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                           <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
@@ -2332,15 +2332,14 @@ export const Scope = ({
                           </div>
                         </div>
                       ) : (
-                        <div className="flex flex-col justify-end h-full">
-                        <div className="space-y-2">
+                        <div className="flex flex-col space-y-3">
                           {messages.map((message, index) => (
                             <motion.div
                               key={index}
                               initial={{ opacity: 0, y: 10, scale: 0.95 }}
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               transition={{ duration: 0.2, ease: "easeOut" }}
-                              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-1`}
+                              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                             >
                               <div
                                 className={`max-w-[75%] rounded-2xl px-4 py-3 break-words shadow-sm ${
@@ -2366,7 +2365,7 @@ export const Scope = ({
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: 10, scale: 0.95 }}
                               transition={{ duration: 0.2, ease: "easeOut" }}
-                              className="flex justify-start mb-1"
+                              className="flex justify-start"
                             >
                               <div className="bg-gray-700 text-gray-100 rounded-2xl rounded-bl-md px-4 py-3 max-w-[75%] shadow-sm">
                                 <div className="flex items-center space-x-2">
@@ -2380,7 +2379,6 @@ export const Scope = ({
                               </div>
                             </motion.div>
                           )}
-                        </div>
                         </div>
                       )}
                       

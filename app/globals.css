@@ -207,6 +207,22 @@ h1, h2, h3, h4, h5, h6, p, span, div, button, input, textarea, label {
   max-height: 64px !important;
 }
 
+/* Messenger-style chat container */
+.messenger-chat-container {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  min-height: 100% !important;
+}
+
+/* Ensure messages start from bottom and push up */
+.messenger-messages {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  min-height: 100% !important;
+}
+
 /* Prevent jumping and ensure smooth webm button animations */
 .radial-video-buttons {
   will-change: transform;
@@ -267,23 +283,6 @@ video {
   background-image: none !important;
 }
 
-/* Special handling for all companions to ensure transparency */
-video[src*="The Analyzer"],
-img[src*="The Analyzer"],
-video[src*="The Predictor"],
-img[src*="The Predictor"],
-video[src*="The Quantum Eraser"],
-img[src*="The Quantum Eraser"],
-video[src*="The Retrocasual"],
-img[src*="The Retrocasual"] {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  mix-blend-mode: screen !important;
-  filter: brightness(1.2) contrast(1.1) !important;
-  background-clip: padding-box !important;
-  -webkit-background-clip: padding-box !important;
-}
 
 /* Force all companion videos to use screen blend mode */
 .companion-video video,
