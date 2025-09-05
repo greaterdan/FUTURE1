@@ -8,6 +8,7 @@ import SocialBadges from './SocialBadges';
 import HoverImagePreview from './HoverImagePreview';
 import CreationTimeDisplay from './CreationTimeDisplay';
 import TokenSearch from './TokenSearch';
+import { chatService, ChatMessage } from '../utils/chatService';
 
 // Star Button Component
 const StarButton: React.FC<{ tokenMint: string }> = ({ tokenMint }) => {
@@ -1399,8 +1400,20 @@ export const Scope = ({
 
 
   // Chat functions - memoized to prevent recreation
-  const sendMessage = useCallback(() => {
-    if (!inputMessage.trim()) return;
+  const sendMessage = useCallback(async () => {
+    console.log('🚀🚀🚀 SENDMESSAGE FUNCTION CALLED!');
+    console.log('📝 Input message:', inputMessage);
+    console.log('📝 Input message length:', inputMessage.length);
+    console.log('📝 Input message trimmed:', inputMessage.trim());
+    
+    if (!inputMessage.trim()) {
+      console.log('❌ No message to send - input is empty');
+      return;
+    }
+    
+    console.log('🚀 Sending message:', inputMessage);
+    console.log('🤖 Active companion:', activeCompanion);
+    console.log('📝 Current messages:', messages.length);
     
     const userMessage = { type: 'user' as const, content: inputMessage, timestamp: new Date() };
     setMessages(prev => [...prev, userMessage]);
@@ -1431,32 +1444,41 @@ export const Scope = ({
       }
     }
     
-    // Simulate companion typing
-    const randomCompanion = agents[Math.floor(Math.random() * agents.length)].name;
-    setTypingCompanion(randomCompanion);
+    // Get the active companion or use a random one
+    const currentCompanion = activeCompanion?.name || agents[Math.floor(Math.random() * agents.length)].name;
+    setTypingCompanion(currentCompanion);
     setIsTyping(true);
     
-    // Simulate typing duration based on message length and companion personality
-    const baseTypingTime = 1000; // Base 1 second
-    const charTypingTime = 50; // 50ms per character
-    const personalityDelay = Math.random() * 2000; // Random personality delay
-    const typingDuration = baseTypingTime + (inputMessage.length * charTypingTime) + personalityDelay;
+    // Prepare conversation history for API
+    const conversationHistory: ChatMessage[] = messages.map(msg => ({
+      role: msg.type === 'user' ? 'user' : 'assistant',
+      content: msg.content
+    }));
     
-    setTimeout(() => {
+    // Call the chat service
+    try {
+      console.log('📞 Calling chat service...');
+      let response: string;
+      
+      // If there's an active companion attached to a token, use token analysis
+      if (activeCompanion && activeCompanion.tokenMint) {
+        console.log('🎯 Using token analysis for:', activeCompanion.name, 'on token:', activeCompanion.tokenMint);
+        const token = tokens.find(t => t.mint === activeCompanion.tokenMint);
+        if (token) {
+          response = await chatService.analyzeToken(token, activeCompanion.name, inputMessage);
+        } else {
+          response = await chatService.getCompanionResponse(activeCompanion.name, conversationHistory, inputMessage);
+        }
+      } else {
+        console.log('💬 Using general companion response for:', currentCompanion);
+        // Use general companion response
+        response = await chatService.getCompanionResponse(currentCompanion, conversationHistory, inputMessage);
+      }
+      
+      console.log('✅ Received response:', response);
+      
       setIsTyping(false);
       setTypingCompanion(null);
-      
-      // Generate more realistic companion responses based on their role
-      let response = '';
-      if (randomCompanion === 'The Analyzer') {
-        response = `${randomCompanion}: I've analyzed "${inputMessage}" and found some interesting patterns. The market dynamics suggest...`;
-      } else if (randomCompanion === 'The Predictor') {
-        response = `${randomCompanion}: Based on "${inputMessage}", my prediction models indicate a potential trend shift. The momentum suggests...`;
-      } else if (randomCompanion === 'The Retrocasual') {
-        response = `${randomCompanion}: I've simulated future scenarios for "${inputMessage}" and the temporal echoes reveal...`;
-      } else {
-        response = `${randomCompanion}: I understand you're asking about: ${inputMessage}. Let me analyze this for you...`;
-      }
       
       const assistantMessage = { 
         type: 'assistant' as const, 
@@ -1477,19 +1499,45 @@ export const Scope = ({
           return updated;
         });
       }
-    }, typingDuration);
-  }, [inputMessage, messages.length, currentConversationId]);
+    } catch (error) {
+      console.error('Chat API error:', error);
+      setIsTyping(false);
+      setTypingCompanion(null);
+      
+      // Fallback response if API fails
+      const fallbackResponse = `${currentCompanion}: I apologize, but I'm having trouble connecting to my analysis systems right now. Please try again in a moment.`;
+      
+      const assistantMessage = { 
+        type: 'assistant' as const, 
+        content: fallbackResponse, 
+        timestamp: new Date() 
+      };
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Update conversation history with the fallback response
+      if (currentConversationId) {
+        setConversationHistory(prev => {
+          const updated = [...prev];
+          const currentConvIndex = updated.findIndex(conv => conv.id === currentConversationId);
+          
+          if (currentConvIndex !== -1) {
+            updated[currentConvIndex].messages = [...updated[currentConvIndex].messages, assistantMessage];
+          }
+          return updated;
+        });
+      }
+    }
+  }, [inputMessage, messages.length, currentConversationId, activeCompanion, tokens, agents]);
 
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
+      console.log('🔥 ENTER KEY PRESSED - Calling sendMessage');
       sendMessage();
     }
   }, [sendMessage]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
     setInputMessage(e.target.value);
     
     // Auto-close settings menu when user starts typing
@@ -1733,7 +1781,7 @@ export const Scope = ({
                   focusToken={focusToken}
                   className="border-r border-gray-700 flex-1 min-w-0"
                 />
-                <div className="flex flex-col flex-1 min-w-0 relative">
+                <div className="flex flex-col flex-1 min-w-0 relative h-[calc(100vh-200px)] overflow-hidden">
                 {/* Drag Target Preview */}
                 {dragTargetToken && !attachedCompanions[dragTargetToken.mint] && (
                   <motion.div
@@ -1820,102 +1868,150 @@ export const Scope = ({
                   );
                 })()}
                 
-                {/* Scroll section */}
-                <div className="flex-1 overflow-y-auto">
-                  <div className="flex justify-center">
-                    <div className="flex gap-4">
-                      {agents.filter(agent => !activeCompanion || activeCompanion.name !== agent.name).map((agent, index) => (
-                        <div
-                          key={index}
-                          draggable="true"
-                          className="relative w-20 h-20 rounded-full cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110"
-                          style={{ background: 'transparent' }}
-                          onMouseEnter={() => setHoveredAgent(agent)}
-                          onMouseLeave={() => setHoveredAgent(null)}
-                          onDragStart={(e) => {
-                            console.log('Drag started for:', agent.name);
-                            e.dataTransfer.setData('text/plain', agent.name);
-                            e.dataTransfer.effectAllowed = 'copy';
-                            setIsDragging(true);
-                            
-                            // Simple visual feedback - just scale up
-                            (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)';
-                          }}
-                          onDragEnd={(e) => {
-                            // Reset the scale and drag state
-                            (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
-                            setIsDragging(false);
-                            // Clear drag target after a short delay to allow drop handler to run first
-                            setTimeout(() => {
-                              setDragTargetToken(null);
-                            }, 100);
+                {/* Companion orbs section - positioned under COMPANIONS header */}
+                <div className="flex justify-center py-4">
+                  <div className="flex gap-4">
+                    {agents.filter(agent => !activeCompanion || activeCompanion.name !== agent.name).map((agent, index) => (
+                      <div
+                        key={index}
+                        draggable="true"
+                        className="relative w-20 h-20 rounded-full cursor-grab active:cursor-grabbing overflow-hidden transition-all duration-300 hover:scale-110"
+                        style={{ background: 'transparent' }}
+                        onMouseEnter={() => setHoveredAgent(agent)}
+                        onMouseLeave={() => setHoveredAgent(null)}
+                        onDragStart={(e) => {
+                          console.log('Drag started for:', agent.name);
+                          e.dataTransfer.setData('text/plain', agent.name);
+                          e.dataTransfer.effectAllowed = 'copy';
+                          setIsDragging(true);
+                          
+                          // Simple visual feedback - just scale up
+                          (e.currentTarget as HTMLElement).style.transform = 'scale(1.1)';
+                        }}
+                        onDragEnd={(e) => {
+                          // Reset the scale and drag state
+                          (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+                          setIsDragging(false);
+                          // Clear drag target after a short delay to allow drop handler to run first
+                          setTimeout(() => {
+                            setDragTargetToken(null);
+                          }, 100);
+                        }}
+                      >
+                        <video 
+                          className="w-full h-full object-cover pointer-events-none companion-video"
+                          autoPlay 
+                          muted 
+                          loop
+                          playsInline
+                          style={{ 
+                            mixBlendMode: 'screen',
+                            filter: 'brightness(1.2) contrast(1.1)',
+                            background: 'transparent',
+                            backgroundColor: 'transparent',
+                            backgroundImage: 'none',
+                            backgroundClip: 'content-box',
+                            isolation: 'isolate'
                           }}
                         >
-                          <video 
-                            className="w-full h-full object-cover pointer-events-none companion-video"
-                            autoPlay 
-                            muted 
-                            loop
-                            playsInline
-                            style={{ 
-                              mixBlendMode: 'screen',
-                              filter: 'brightness(1.2) contrast(1.1)',
-                              background: 'transparent',
-                              backgroundColor: 'transparent',
-                              backgroundImage: 'none',
-                              backgroundClip: 'content-box',
-                              isolation: 'isolate'
-                            }}
-                          >
-                            <source src={agent.videoFile} type="video/webm" />
-                          </video>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-center h-full">
-                    <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
-                      Drag a companion onto a token, pick a companion, or start typing to begin…
-                    </div>
+                          <source src={agent.videoFile} type="video/webm" />
+                        </video>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                
-                {/* Chat input row at bottom */}
-                <div className="shrink-0">
-                  <div className="w-full bg-black/70 border-t border-gray-700 p-2 flex items-center gap-2 h-16 chat-input-container">
-                    <input
-                      type="text"
-                      value={inputMessage}
-                      onChange={handleInputChange}
-                      onKeyPress={handleKeyPress}
-                      onFocus={(e) => e.preventDefault()}
-                      onBlur={(e) => e.preventDefault()}
-                      placeholder="Type your message..."
-                      className="flex-1 rounded-lg bg-gray-900 p-1.5 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 h-9 ml-1"
-                      style={{ scrollBehavior: 'auto' }}
-                    />
-                    <button
-                      onClick={() => {
-                        setIsSettingsOpen(!isSettingsOpen);
-                        if (!isSettingsOpen) {
-                          setSettingsView('menu');
-                        }
-                      }}
-                      className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3 py-1.5 h-9 transition-colors duration-200"
-                      title="Settings & History"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={sendMessage}
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 h-9"
-                    >
-                      Send
-                    </button>
+
+                {/* Main content area with proper height calculation */}
+                <div className="flex-1 flex flex-col min-h-0 max-h-full overflow-hidden">
+                  {/* Messages display area */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+                    {messages.length === 0 ? (
+                      <div className="flex items-center justify-center h-full">
+                        <div className="text-gray-500 text-center italic transition-opacity duration-300 ease-in-out text-lg">
+                          Drag a companion onto a token, pick a companion, or start typing to begin…
+                        </div>
+                      </div>
+                    ) : (
+                      messages.map((message, index) => (
+                        <div
+                          key={index}
+                          className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[80%] rounded-lg p-3 ${
+                              message.type === 'user'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-700 text-gray-100'
+                            }`}
+                          >
+                            <div className="text-base">{message.content}</div>
+                            <div className={`text-xs mt-1 ${
+                              message.type === 'user' ? 'text-blue-200' : 'text-gray-400'
+                            }`}>
+                              {message.timestamp.toLocaleTimeString()}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                    
+                    {/* Typing indicator */}
+                    {isTyping && typingCompanion && (
+                      <div className="flex justify-start">
+                        <div className="bg-gray-700 text-gray-100 rounded-lg p-3 max-w-[80%]">
+                          <div className="flex items-center space-x-2">
+                            <div className="flex space-x-1">
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                            <span className="text-sm text-gray-400">{typingCompanion} is typing...</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Auto-scroll anchor */}
+                    <div ref={messagesEndRef} />
+                  </div>
+                  
+                  {/* Chat input row at bottom */}
+                  <div className="shrink-0">
+                    <div className="w-full bg-black/70 border-t border-gray-700 p-2 flex items-center gap-2 h-16 chat-input-container">
+                      <input
+                        type="text"
+                        value={inputMessage}
+                        onChange={handleInputChange}
+                        onKeyPress={handleKeyPress}
+                        placeholder="Type your message..."
+                        className="flex-1 rounded-lg bg-gray-900 p-1.5 text-base text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 h-9 ml-1"
+                        style={{ scrollBehavior: 'auto' }}
+                      />
+                      <button
+                        onClick={() => {
+                          setIsSettingsOpen(!isSettingsOpen);
+                          if (!isSettingsOpen) {
+                            setSettingsView('menu');
+                          }
+                        }}
+                        className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3 py-1.5 h-9 transition-colors duration-200"
+                        title="Settings & History"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => {
+                          console.log('🔥 SEND BUTTON CLICKED - Calling sendMessage');
+                          sendMessage();
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 h-9"
+                      >
+                        Send
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
