@@ -35,11 +35,11 @@ export class MarketcapUpdaterService {
             logger.info('🚀 Starting marketcap updater service...');
             logger.info(`🔑 Birdeye API Key configured: ${this.birdeyeApiKey ? 'YES' : 'NO'}`);
             
-            // Start the update loop (5 seconds for faster live data)
+            // Start the update loop (3 seconds for faster fresh mint processing)
             this.intervalId = setInterval(async () => {
                 logger.info('⏰ Marketcap update cycle triggered');
                 await this.updateAllTokens();
-            }, 5000); // 5 seconds for faster live marketcap data
+            }, 3000); // 3 seconds for faster fresh mint market cap data
 
             this.isRunning = true;
             logger.info('✅ Marketcap updater service started successfully');
@@ -82,15 +82,32 @@ export class MarketcapUpdaterService {
             const targetTokens = allTokens.filter(t => this.isTargetToken(t));
             logger.info(`🎯 Target tokens for pricing: ${targetTokens.length}`);
             
-            // Process tokens in rotating batches - start from where we left off
+            // Prioritize fresh mints - always include them in the batch
+            const freshTokens = targetTokens.filter(t => t.status === 'fresh');
+            const otherTokens = targetTokens.filter(t => t.status !== 'fresh');
+            
+            // Process fresh tokens first, then other tokens in rotating batches
             const batchSize = 15; // Smaller batches for faster processing
-            const startIndex = (this.currentBatchIndex * batchSize) % targetTokens.length;
-            const tokensToProcess = targetTokens.slice(startIndex, startIndex + batchSize);
+            let tokensToProcess: any[] = [];
             
-            // Update batch index for next cycle
-            this.currentBatchIndex = (this.currentBatchIndex + 1) % Math.ceil(targetTokens.length / batchSize);
+            // Always include fresh tokens (up to batch size)
+            if (freshTokens.length > 0) {
+                tokensToProcess = freshTokens.slice(0, batchSize);
+                logger.info(`🔥 Processing ${freshTokens.length} fresh mints first`);
+            }
             
-            logger.info(`🚀 Processing batch ${this.currentBatchIndex}: ${tokensToProcess.length} tokens (starting from index ${startIndex})`);
+            // Fill remaining slots with other tokens
+            if (tokensToProcess.length < batchSize && otherTokens.length > 0) {
+                const remainingSlots = batchSize - tokensToProcess.length;
+                const startIndex = (this.currentBatchIndex * remainingSlots) % otherTokens.length;
+                const additionalTokens = otherTokens.slice(startIndex, startIndex + remainingSlots);
+                tokensToProcess = [...tokensToProcess, ...additionalTokens];
+                
+                // Update batch index for next cycle
+                this.currentBatchIndex = (this.currentBatchIndex + 1) % Math.ceil(otherTokens.length / remainingSlots);
+            }
+            
+            logger.info(`🚀 Processing batch: ${tokensToProcess.length} tokens (${freshTokens.length} fresh, ${tokensToProcess.length - freshTokens.length} others)`);
             
             // Log some sample tokens
             if (tokensToProcess.length > 0) {
@@ -122,7 +139,8 @@ export class MarketcapUpdaterService {
     }
 
     private isTargetToken(_token: any): boolean {
-        // Process ALL tokens immediately - Birdeye API has data for new tokens
+        // Prioritize fresh mints and active tokens
+        // Process ALL tokens but prioritize fresh mints for immediate market cap data
         return true;
     }
 

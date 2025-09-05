@@ -7,6 +7,45 @@ import * as cron from "node-cron";
 
 const clean = (s?: string | null) => (s && s.trim() ? s.trim() : undefined);
 
+const isUnwantedToken = (name?: string, symbol?: string): boolean => {
+  if (!name && !symbol) return false;
+  
+  const nameLower = (name || '').toLowerCase();
+  const symbolLower = (symbol || '').toLowerCase();
+  
+  // Filter out unwanted patterns
+  const unwantedPatterns = [
+    // Jupiter patterns
+    'jupiter vault',
+    'jv', // jupiter vault tokens
+    'jupiter',
+    
+    // Sugar patterns
+    'sugar',
+    'sugarglider',
+    
+    // .sol domain patterns
+    '.sol',
+    
+    // Orbit/Earth patterns
+    'orbit',
+    'earth',
+    'earthorbit',
+    'highearthorbit',
+    'orbitpig',
+    'pigorbit',
+    
+    // Other unwanted patterns
+    'vault',
+    'test',
+    'demo'
+  ];
+  
+  return unwantedPatterns.some(pattern => 
+    nameLower.includes(pattern) || symbolLower.includes(pattern)
+  );
+};
+
 export class MetadataEnricherService {
   private cronJob?: cron.ScheduledTask;
   private isRunning = false;
@@ -131,6 +170,12 @@ export class MetadataEnricherService {
           if (ur) update.metadata_uri = ur;
 
           if (Object.keys(update).length) {
+            // Check if this is an unwanted token and skip processing
+            if (isUnwantedToken(nm, sy)) {
+              logger.info(`🚫 Unwanted token detected, skipping: ${nm || 'Unknown'} (${sy || 'Unknown'})`);
+              return;
+            }
+            
             await this.repo.updateTokenMetadataByMint(mint, update);
             logger.info(`✅ Metadata enriched: ${nm || 'Unknown'} (${sy || 'Unknown'}) from ${ur || 'on-chain'}`);
           }
@@ -185,6 +230,12 @@ export class MetadataEnricherService {
           if (im) update.image_url = im;
 
           if (Object.keys(update).length) {
+            // Check if this is an unwanted token and skip processing
+            if (isUnwantedToken(nm, sy)) {
+              logger.info(`🚫 Unwanted token detected via Helius, skipping: ${nm || 'Unknown'} (${sy || 'Unknown'})`);
+              return;
+            }
+            
             await this.repo.updateTokenMetadataByMint(mint, update);
             logger.info(`✅ Metadata enriched via Helius fallback: ${nm || 'Unknown'} (${sy || 'Unknown'})`);
           }

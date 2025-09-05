@@ -878,19 +878,32 @@ export const Scope = ({
       isOnCurve: t.isOnCurve // Use transformed property name
     })));
     
+    // Filter out unwanted tokens (Jupiter, Sugar, .sol domains, etc.)
+    const isUnwantedToken = (token: any) => {
+      if (!token) return true;
+      
+      const name = (token.name || '').toLowerCase();
+      const symbol = (token.symbol || '').toLowerCase();
+      
+      const unwantedPatterns = [
+        'jupiter vault', 'jv', 'jupiter',
+        'sugar', 'sugarglider',
+        '.sol',
+        'orbit', 'earth', 'earthorbit', 'highearthorbit', 'orbitpig', 'pigorbit',
+        'vault', 'test', 'demo'
+      ];
+      
+      return unwantedPatterns.some(pattern => 
+        name.includes(pattern) || symbol.includes(pattern)
+      );
+    };
+
     // Use transformed property names from useServerData and limit to 40 tokens each
-    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh').slice(0, 40); // Show fresh tokens (the actual fresh mints)
-    const filled = tokensToFilter.filter(t => t && t.status === 'active' && !t.isOnCurve).slice(0, 30); // Show active tokens
-    // EDGE: Fresh tokens sorted by marketcap (highest to lowest, up to 84K)
-    const onEdge = tokensToFilter
-      .filter(t => t && t.status === 'fresh' && !t.isOnCurve && t.marketcap && t.marketcap !== 'null' && t.marketcap !== '0')
-      .filter(t => {
-        const marketcapValue = parseFloat(t.marketcap);
-        return marketcapValue > 0 && marketcapValue <= 84000; // Up to 84K
-      })
-      .sort((a, b) => parseFloat(b.marketcap) - parseFloat(a.marketcap)) // Sort by marketcap descending
-      .slice(0, 30);
-    const curveTokens = tokensToFilter.filter(t => t && (t.status === 'curve' || t.isOnCurve)).slice(0, 30);
+    const newPairs = tokensToFilter.filter(t => t && t.status === 'fresh' && !isUnwantedToken(t)).slice(0, 40); // Show fresh tokens (the actual fresh mints)
+    const filled = tokensToFilter.filter(t => t && t.status === 'active' && !t.isOnCurve && !isUnwantedToken(t)).slice(0, 30); // Show active tokens
+    // EDGE: No tokens on edge - temporarily removed
+    const onEdge: any[] = [];
+    const curveTokens = tokensToFilter.filter(t => t && (t.status === 'curve' || t.isOnCurve) && !isUnwantedToken(t)).slice(0, 30);
     
     console.log("✅ Filtered tokens:", {
       newPairs: newPairs.length,

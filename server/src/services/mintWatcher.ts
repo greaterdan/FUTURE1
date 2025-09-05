@@ -134,6 +134,12 @@ export class MintWatcherService {
                 return;
             }
 
+            // Check if this is a Jupiter or Sugar token and skip it
+            if (this.isJupiterOrSugarToken(mintInfo.mint)) {
+                logger.info(`🚫 Skipping Jupiter/Sugar token: ${mintInfo.mint}`);
+                return;
+            }
+
             // Save to database
             const newToken = await tokenRepository.createToken(
                 mintInfo.mint,
@@ -160,12 +166,40 @@ export class MintWatcherService {
                 } else {
                     logger.warn('WebSocket service not available for broadcasting new token');
                 }
+                
+                // Trigger immediate market cap update for fresh mint
+                try {
+                    // Note: This will be handled by the market cap updater service automatically
+                    // since it now prioritizes fresh mints in its update cycle
+                    logger.info(`📊 Fresh mint ${newToken.mint} will be prioritized for market cap update`);
+                } catch (error) {
+                    logger.debug('Market cap updater service not available for immediate update');
+                }
             }
             
         } catch (error) {
             logger.error(`Error processing InitializeMint transaction ${signature}:`, error);
         }
     }
+
+    private isJupiterOrSugarToken(mint: string): boolean {
+        // Known Jupiter and Sugar token patterns
+        const jupiterPatterns = [
+            'JUP', // Jupiter token
+            'JUPITER', // Jupiter variations
+        ];
+        
+        const sugarPatterns = [
+            'SUGAR', // Sugar token
+            'SUGARGLIDER', // Sugar glider variations
+        ];
+        
+        // Check if mint contains any of these patterns
+        const upperMint = mint.toUpperCase();
+        return jupiterPatterns.some(pattern => upperMint.includes(pattern)) ||
+               sugarPatterns.some(pattern => upperMint.includes(pattern));
+    }
+
 
     private extractMintInfo(tx: any): { mint: string; decimals: number; supply: number; blocktime: number } | null {
         try {

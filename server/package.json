@@ -21,8 +21,6 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
-    "@metaplex-foundation/js": "^0.20.1",
-    "@metaplex-foundation/mpl-token-metadata": "^3.2.0",
     "@solana/spl-token": "^0.1.8",
     "@solana/web3.js": "^1.98.4",
     "@types/ws": "^8.18.1",

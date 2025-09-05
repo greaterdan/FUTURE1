@@ -15,14 +15,18 @@ class DatabaseConnection {
             user: process.env.DB_USER || 'postgres',
             password: process.env.DB_PASSWORD || 'password',
             max: 20,
+            min: 5,
             idleTimeoutMillis: 30000,
-            connectionTimeoutMillis: 2000,
+            connectionTimeoutMillis: 5000,
+            acquireTimeoutMillis: 10000,
+            allowExitOnIdle: false,
         });
 
         // Handle pool errors
         this.pool.on('error', (err) => {
             console.error('Unexpected error on idle client', err);
-            process.exit(-1);
+            // Don't exit the process, just log the error and continue
+            // The pool will handle reconnection automatically
         });
     }
 
@@ -38,12 +42,23 @@ class DatabaseConnection {
     }
 
     public async query(text: string, params?: any[]): Promise<any> {
-        const client = await this.getClient();
+        let client;
         try {
+            client = await this.getClient();
             const result = await client.query(text, params);
             return result;
+        } catch (error: any) {
+            if (error.message?.includes('Cannot use a pool after calling end on the pool')) {
+                console.error('Database pool error detected, attempting to reconnect...');
+                // Recreate the pool if it's been closed
+                this.recreatePool();
+                throw new Error('Database connection lost, please retry');
+            }
+            throw error;
         } finally {
-            client.release();
+            if (client) {
+                client.release();
+            }
         }
     }
 
@@ -60,6 +75,33 @@ class DatabaseConnection {
         } finally {
             client.release();
         }
+    }
+
+    private recreatePool(): void {
+        try {
+            if (this.pool && !this.pool.ended) {
+                this.pool.end();
+            }
+        } catch (error) {
+            console.error('Error closing old pool:', error);
+        }
+        
+        // Create a new pool
+        this.pool = new Pool({
+            host: process.env.DB_HOST || 'localhost',
+            port: parseInt(process.env.DB_PORT || '5432'),
+            database: process.env.DB_NAME || 'solana_tokens',
+            user: process.env.DB_USER || 'postgres',
+            password: process.env.DB_PASSWORD || 'password',
+            max: 20,
+            min: 5,
+            idleTimeoutMillis: 30000,
+            connectionTimeoutMillis: 5000,
+            acquireTimeoutMillis: 10000,
+            allowExitOnIdle: false,
+        });
+        
+        console.log('Database pool recreated successfully');
     }
 
     public async close(): Promise<void> {
