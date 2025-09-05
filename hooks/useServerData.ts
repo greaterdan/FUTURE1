@@ -127,6 +127,8 @@ export const useServerData = (isOpen: boolean) => {
   });
   const [live, setLive] = useState<boolean>(true);
   const [newTokenMint, setNewTokenMint] = useState<string | null>(null);
+  const [isHoverPaused, setIsHoverPaused] = useState<boolean>(false);
+  const [queuedTokens, setQueuedTokens] = useState<TransformedTokenData[]>([]);
 
   // WebSocket connection for real-time updates
   const wsUrl = process.env.NODE_ENV === 'production' 
@@ -254,29 +256,87 @@ export const useServerData = (isOpen: boolean) => {
     console.log("⏸️ Live updates paused");
   }, []);
 
+  // Pause live updates due to hover
+  const pauseLiveOnHover = useCallback(() => {
+    setIsHoverPaused(true);
+    console.log("⏸️ Live updates paused due to hover");
+  }, []);
+
+  // Resume live updates after hover ends
+  const resumeLiveAfterHover = useCallback(() => {
+    setIsHoverPaused(false);
+    
+    // Process any queued tokens
+    if (queuedTokens.length > 0) {
+      console.log(`🔄 Processing ${queuedTokens.length} queued tokens after hover`);
+      
+      // Add queued tokens to the main list
+      setTokens(prev => {
+        const existingMints = new Set(prev.map(t => t.mint));
+        const newTokens = queuedTokens.filter(t => !existingMints.has(t.mint));
+        
+        if (newTokens.length > 0) {
+          const combined = [...newTokens, ...prev];
+          // Limit to 200 tokens to prevent memory issues
+          return combined.slice(0, 200);
+        }
+        
+        return prev;
+      });
+      
+      // Set the first queued token as the new token for animation
+      if (queuedTokens.length > 0) {
+        setNewTokenMint(queuedTokens[0].mint);
+        setTimeout(() => setNewTokenMint(null), 1000);
+      }
+      
+      // Clear the queue
+      setQueuedTokens([]);
+      setLastUpdate(new Date());
+    }
+    
+    console.log("▶️ Live updates resumed after hover");
+  }, [queuedTokens]);
+
   // Handle WebSocket messages for real-time updates
   useEffect(() => {
     if (lastMessage) {
       if (lastMessage.type === 'new_token') {
-        // Add new token to the list (check for duplicates)
         const newToken = transformTokenData(lastMessage.data);
-        setTokens(prev => {
-          // Check if token already exists
-          const exists = prev.some(token => token.mint === newToken.mint);
-          if (exists) {
-            console.log('⚠️ DUPLICATE TOKEN PREVENTED:', newToken.mint);
-            return prev;
-          }
-          console.log('🔥 NEW TOKEN RECEIVED VIA WEBSOCKET:', newToken.name || newToken.symbol || newToken.mint);
-          const combined = [newToken, ...prev];
-          // Limit to 200 tokens to prevent memory issues
-          return combined.slice(0, 200);
-        });
-        setLastUpdate(new Date());
-        setNewTokenMint(newToken.mint);
         
-        // Clear the flag after animation
-        setTimeout(() => setNewTokenMint(null), 1000);
+        // Check if we're in hover pause mode
+        if (isHoverPaused) {
+          // Queue the token instead of adding it immediately
+          setQueuedTokens(prev => {
+            // Check for duplicates in queue
+            const exists = prev.some(token => token.mint === newToken.mint);
+            if (exists) {
+              console.log('⚠️ DUPLICATE TOKEN PREVENTED IN QUEUE:', newToken.mint);
+              return prev;
+            }
+            console.log('📦 TOKEN QUEUED DURING HOVER PAUSE:', newToken.name || newToken.symbol || newToken.mint);
+            return [...prev, newToken];
+          });
+        } else {
+          // Add new token to the list (check for duplicates)
+          setTokens(prev => {
+            // Check if token already exists
+            const exists = prev.some(token => token.mint === newToken.mint);
+            if (exists) {
+              console.log('⚠️ DUPLICATE TOKEN PREVENTED:', newToken.mint);
+              return prev;
+            }
+            console.log('🔥 NEW TOKEN RECEIVED VIA WEBSOCKET:', newToken.name || newToken.symbol || newToken.mint);
+            const combined = [newToken, ...prev];
+            // Limit to 200 tokens to prevent memory issues
+            return combined.slice(0, 200);
+          });
+          setLastUpdate(new Date());
+          setNewTokenMint(newToken.mint);
+          
+          // Clear the flag after animation
+          setTimeout(() => setNewTokenMint(null), 1000);
+        }
       } else if (lastMessage.type === 'token_update') {
         // Update existing token
         const updatedToken = transformTokenData(lastMessage.data);
@@ -339,6 +399,10 @@ export const useServerData = (isOpen: boolean) => {
     live,
     resumeLive,
     pauseLive,
+    pauseLiveOnHover,
+    resumeLiveAfterHover,
+    isHoverPaused,
+    queuedTokens,
     searchTokens,
     filterByStatus,
     refresh: fetchTokens,

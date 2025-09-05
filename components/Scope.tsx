@@ -300,8 +300,10 @@ type CardProps = {
   agents: Array<{ name: string; videoFile: string }>;
   attachedCompanion?: string | null;
   onCompanionDetach?: (tokenMint: string) => void;
+  onHoverEnter?: () => void;
+  onHoverLeave?: () => void;
 };
-const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach }) => {
+const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef, onCompanionAttached, agents, attachedCompanion, onCompanionDetach, onHoverEnter, onHoverLeave }) => {
   const cardRef = useVisibility(token.mint, visibleMintsRef);
   const [isDragOver, setIsDragOver] = useState(false);
   
@@ -378,6 +380,8 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
       draggable={false}
     >
       {/* Drop indicator overlay */}
@@ -574,7 +578,9 @@ function TokenColumn({
   agents,
   newTokenMint,
   attachedCompanions,
-  onCompanionDetach
+  onCompanionDetach,
+  onHoverEnter,
+  onHoverLeave
 }: { 
   title: string; 
   items: any[]; 
@@ -585,6 +591,8 @@ function TokenColumn({
   newTokenMint: string | null;
   attachedCompanions: Record<string, string>;
   onCompanionDetach?: (tokenMint: string) => void;
+  onHoverEnter?: () => void;
+  onHoverLeave?: () => void;
 }) {
 
   return (
@@ -629,6 +637,8 @@ function TokenColumn({
                           agents={agents}
                           attachedCompanion={companionForToken}
                           onCompanionDetach={onCompanionDetach}
+                          onHoverEnter={onHoverEnter}
+                          onHoverLeave={onHoverLeave}
                         />
                       </motion.div>
                     ) : (
@@ -639,6 +649,8 @@ function TokenColumn({
                         agents={agents}
                         attachedCompanion={attachedCompanions[token.mint] || null}
                         onCompanionDetach={onCompanionDetach}
+                        onHoverEnter={onHoverEnter}
+                        onHoverLeave={onHoverLeave}
                       />
                     )}
                   </div>
@@ -662,6 +674,10 @@ export const Scope = ({
   live, 
   resumeLive, 
   pauseLive,
+  pauseLiveOnHover,
+  resumeLiveAfterHover,
+  isHoverPaused,
+  queuedTokens,
   newTokenMint,
   onClose
 }: { 
@@ -674,6 +690,10 @@ export const Scope = ({
   live: boolean;
   resumeLive: () => void;
   pauseLive: () => void;
+  pauseLiveOnHover: () => void;
+  resumeLiveAfterHover: () => void;
+  isHoverPaused: boolean;
+  queuedTokens: any[];
   newTokenMint: string | null;
   onClose: () => void;
 }) => {
@@ -1141,6 +1161,7 @@ export const Scope = ({
                   Reset
                 </motion.button>
               )}
+
             </motion.div>
           </div>
         
@@ -1206,6 +1227,8 @@ export const Scope = ({
                 newTokenMint={newTokenMint}
                 attachedCompanions={attachedCompanions}
                 onCompanionDetach={handleCompanionDetach}
+                onHoverEnter={pauseLiveOnHover}
+                onHoverLeave={resumeLiveAfterHover}
                 onCompanionAttached={(companionName, token) => {
                   // Handle companion attachment
                   handleCompanionAttached(companionName, token);
@@ -1266,6 +1289,8 @@ export const Scope = ({
                 newTokenMint={newTokenMint}
                 attachedCompanions={attachedCompanions}
                 onCompanionDetach={handleCompanionDetach}
+                onHoverEnter={pauseLiveOnHover}
+                onHoverLeave={resumeLiveAfterHover}
                 onCompanionAttached={(companionName, token) => {
                   // Handle companion attachment
                   handleCompanionAttached(companionName, token);

@@ -39,6 +39,10 @@ export default function Page() {
     live,
     resumeLive,
     pauseLive,
+    pauseLiveOnHover,
+    resumeLiveAfterHover,
+    isHoverPaused,
+    queuedTokens,
     searchTokens,
     filterByStatus,
     refresh,
@@ -215,6 +219,10 @@ export default function Page() {
               live={live}
               resumeLive={resumeLive}
               pauseLive={pauseLive}
+              pauseLiveOnHover={pauseLiveOnHover}
+              resumeLiveAfterHover={resumeLiveAfterHover}
+              isHoverPaused={isHoverPaused}
+              queuedTokens={queuedTokens}
               newTokenMint={newTokenMint}
               onClose={() => saveScopeState(false)}
             />
