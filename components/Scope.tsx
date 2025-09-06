@@ -11,6 +11,42 @@ import CreationTimeDisplay from './CreationTimeDisplay';
 import TokenSearch from './TokenSearch';
 import { chatService, ChatMessage } from '../utils/chatService';
 
+// Helper function to get companion colors
+const getCompanionColor = (companionName: string) => {
+  switch (companionName) {
+    case 'The Quantum Eraser':
+      return {
+        bg: 'bg-[#637e9a]/10',
+        border: 'border-[#637e9a]/30',
+        text: 'text-[#637e9a]'
+      };
+    case 'The Predictor':
+      return {
+        bg: 'bg-[#3ff600]/10',
+        border: 'border-[#3ff600]/30',
+        text: 'text-[#3ff600]'
+      };
+    case 'The Analyzer':
+      return {
+        bg: 'bg-[#195c8e]/10',
+        border: 'border-[#195c8e]/30',
+        text: 'text-[#195c8e]'
+      };
+    case 'The Retrocasual':
+      return {
+        bg: 'bg-[#a95109]/10',
+        border: 'border-[#a95109]/30',
+        text: 'text-[#a95109]'
+      };
+    default:
+      return {
+        bg: 'bg-green-500/10',
+        border: 'border-green-500/30',
+        text: 'text-green-400'
+      };
+  }
+};
+
 // Star Button Component
 const StarButton: React.FC<{ tokenMint: string }> = ({ tokenMint }) => {
   const { isInWatchlist, addToWatchlist, removeFromWatchlist, watchlist } = React.useContext(WatchlistContext);
@@ -2121,13 +2157,15 @@ export const Scope = ({
                   const token = tokens.find(t => t.mint === attachedCompanion.tokenMint);
                   if (!token) return null;
                   
+                  const companionColors = getCompanionColor(attachedCompanion.name);
+                  
                   return (
                     <motion.div
                       key={attachedCompanion.tokenMint}
                       initial={{ opacity: 0, y: -20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
-                      className="mx-3 mt-3 mb-3 p-2 bg-green-500/10 border border-green-500/30 rounded-lg"
+                      className={`mx-3 mt-3 mb-3 p-2 ${companionColors.bg} border ${companionColors.border} rounded-lg`}
                     >
                       <div className="flex items-center space-x-2">
                         <div className="w-6 h-6 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
@@ -2147,7 +2185,7 @@ export const Scope = ({
                           <div className="text-white text-sm font-medium truncate">
                             {token.name || token.symbol || 'Token'}
                           </div>
-                          <div className="text-green-300 text-sm truncate">
+                          <div className={`${companionColors.text} text-sm truncate`}>
                             {attachedCompanion.name} • {token.mint.slice(0, 6)}...{token.mint.slice(-6)}
                           </div>
                         </div>
