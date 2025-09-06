@@ -572,9 +572,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
       ref={cardRef}
       className={`group relative isolate overflow-visible rounded-xl border p-4 hover:scale-102 hover:z-10 transition-all duration-200 token-card cursor-pointer ${
         isDragOver
-          ? attachedCompanion
-            ? 'border-orange-400 bg-orange-500/20 scale-105 z-20 ring-2 ring-orange-400/50 animate-pulse'
-            : draggedAgent === 'The Quantum Eraser'
+          ? draggedAgent === 'The Quantum Eraser'
             ? 'border-[#637e9a] bg-[#637e9a]/20 scale-105 z-20 ring-2 ring-[#637e9a]/50 animate-pulse'
             : draggedAgent === 'The Predictor'
             ? 'border-[#3ff600] bg-[#3ff600]/20 scale-105 z-20 ring-2 ring-[#3ff600]/50 animate-pulse'
@@ -622,9 +620,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.8 }}
           className={`absolute inset-0 rounded-xl border-2 border-dashed flex items-center justify-center z-10 backdrop-blur-sm ${
-            attachedCompanion
-              ? 'bg-gradient-to-br from-orange-500/20 to-red-500/20 border-orange-400/60'
-              : draggedAgent === 'The Quantum Eraser'
+            draggedAgent === 'The Quantum Eraser'
               ? 'bg-gradient-to-br from-[#637e9a]/20 to-[#637e9a]/30 border-[#637e9a]/60'
               : draggedAgent === 'The Predictor'
               ? 'bg-gradient-to-br from-[#3ff600]/20 to-[#3ff600]/30 border-[#3ff600]/60'
@@ -636,9 +632,7 @@ const TokenCardBase: React.FC<CardProps> = React.memo(({ token, visibleMintsRef,
           }`}
         >
           <div className={`text-sm font-medium flex items-center space-x-2 bg-black/50 px-3 py-2 rounded-lg ${
-            attachedCompanion 
-              ? 'text-orange-400' 
-              : draggedAgent === 'The Quantum Eraser'
+            draggedAgent === 'The Quantum Eraser'
               ? 'text-[#637e9a]'
               : draggedAgent === 'The Predictor'
               ? 'text-[#3ff600]'
@@ -2086,9 +2080,7 @@ export const Scope = ({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     className={`mx-3 mt-3 mb-3 p-2 rounded-lg ${
-                      attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
-                        ? 'bg-orange-500/10 border border-orange-500/30'
-                        : draggedAgent === 'The Quantum Eraser'
+                      draggedAgent === 'The Quantum Eraser'
                         ? 'bg-[#637e9a]/10 border border-[#637e9a]/30'
                         : draggedAgent === 'The Predictor'
                         ? 'bg-[#3ff600]/10 border border-[#3ff600]/30'
@@ -2118,9 +2110,7 @@ export const Scope = ({
                           {dragTargetToken.name || dragTargetToken.symbol || 'Unknown Token'}
                         </div>
                         <div className={`text-sm truncate ${
-                          attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
-                            ? 'text-orange-300'
-                            : draggedAgent === 'The Quantum Eraser'
+                          draggedAgent === 'The Quantum Eraser'
                             ? 'text-[#637e9a]'
                             : draggedAgent === 'The Predictor'
                             ? 'text-[#3ff600]'
@@ -2134,9 +2124,7 @@ export const Scope = ({
                         </div>
                       </div>
                       <div className={`text-sm font-medium ${
-                        attachedCompanion && attachedCompanion.tokenMint === dragTargetToken.mint
-                          ? 'text-orange-400'
-                          : draggedAgent === 'The Quantum Eraser'
+                        draggedAgent === 'The Quantum Eraser'
                           ? 'text-[#637e9a]'
                           : draggedAgent === 'The Predictor'
                           ? 'text-[#3ff600]'
