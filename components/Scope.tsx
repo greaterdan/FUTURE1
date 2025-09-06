@@ -115,55 +115,46 @@ const HelpPopup: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen,
           </button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-white/90">
+        <div className="grid grid-cols-1 gap-4 text-white/90">
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-2">🔍 Token Discovery</h3>
-            <p className="text-sm leading-relaxed">
+            <h3 className="text-xl font-semibold text-white mb-2">Token Discovery</h3>
+            <p className="text-base leading-relaxed">
               Scope automatically discovers and displays new Solana tokens as they're created. 
               Each token card shows real-time market data, social metrics, and creation information.
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-2">⭐ Watchlist</h3>
-            <p className="text-sm leading-relaxed">
+            <h3 className="text-xl font-semibold text-white mb-2">Watchlist</h3>
+            <p className="text-base leading-relaxed">
               Click the star button on any token to add it to your watchlist. You can track up to 10 tokens 
               and access them quickly from the star button in the header.
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-2">📊 Market Data</h3>
-            <p className="text-sm leading-relaxed">
-              View real-time market cap, price changes, holder count, and trading volume. 
-              Green indicates positive changes, red indicates negative changes.
+            <h3 className="text-xl font-semibold text-white mb-2">Market Data</h3>
+            <p className="text-base leading-relaxed">
+              View real-time market cap, price changes, holder count, and trading volume.
+            </p>
+          </div>
+
+
+          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
+            <h3 className="text-xl font-semibold text-white mb-2">AI Companions</h3>
+            <p className="text-base leading-relaxed">
+              Drag a companion to a token card to chat with AI-powered companions and get insights 
+              about tokens, market trends, and trading strategies. Ask questions about any token or market conditions.
             </p>
           </div>
 
           <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-2">🔍 Search & Filter</h3>
-            <p className="text-sm leading-relaxed">
-              Use the search bar to find specific tokens by name or symbol. 
-              Filter tokens by various criteria to narrow down your results.
-            </p>
-          </div>
-
-          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-2">💬 AI Chat</h3>
-            <p className="text-sm leading-relaxed">
-              Click the chat icon to get AI-powered insights about tokens, market trends, 
-              and trading strategies. Ask questions about any token or market conditions.
-            </p>
-          </div>
-
-          <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="text-lg font-semibold text-white mb-2">🎯 Tips</h3>
-            <ul className="text-sm leading-relaxed space-y-1">
-              <li>• Hover over token cards to see additional metrics</li>
-              <li>• Use the refresh button to get the latest data</li>
+            <h3 className="text-xl font-semibold text-white mb-2">Tips</h3>
+            <ul className="text-base leading-relaxed space-y-1">
+              <li>• Click on token cards to see additional metrics</li>
               <li>• Check the creation time to identify very new tokens</li>
               <li>• Monitor holder count for community growth</li>
-              <li>• Watch for tokens with high social engagement</li>
+              <li>• See predictable outcomes with AI-powered analysis</li>
             </ul>
           </div>
         </div>
@@ -288,7 +279,7 @@ const WatchlistPopup: React.FC<{
         <div className="overflow-y-auto max-h-[60vh]">
           {watchlistTokens.length === 0 ? (
             <div className="text-center text-white/60 py-8">
-              <div className="text-4xl mb-4">⭐</div>
+              <div className="text-4xl mb-4">★</div>
               <div className="text-lg">No tokens in watchlist yet</div>
               <div className="text-sm text-white/40 mt-2">Click the star on any token to add it here</div>
             </div>
@@ -1537,7 +1528,7 @@ export const Scope = ({
 
   // Debug: Monitor tokens state changes
   useEffect(() => {
-    console.log("🎯 SCOPE: Tokens state changed:", {
+    console.log("SCOPE: Tokens state changed:", {
       tokensLength: tokens?.length || 0,
       isLoading,
       connectionStatus,
@@ -1551,7 +1542,7 @@ export const Scope = ({
 
   // Memoize filtered tokens to prevent recalculation on every render
   const filteredTokens = useMemo(() => {
-    console.log("🔍 Filtering tokens:", tokens?.length || 0, "tokens received");
+    console.log("Filtering tokens:", tokens?.length || 0, "tokens received");
     
     // Use search filtered tokens if available, otherwise use all tokens
     const tokensToFilter = isSearchFiltered ? searchFilteredTokens : tokens;
@@ -1562,7 +1553,7 @@ export const Scope = ({
     }
     
     // Debug: Log first few tokens to see their structure
-    console.log("🔍 Sample tokens:", tokensToFilter.slice(0, 3).map(t => ({
+    console.log("Sample tokens:", tokensToFilter.slice(0, 3).map(t => ({
       name: t.name,
       symbol: t.symbol,
       status: t.status,
@@ -1639,7 +1630,7 @@ export const Scope = ({
 
   // Chat functions - memoized to prevent recreation
   const sendMessage = useCallback(async () => {
-    console.log('🚀🚀🚀 SENDMESSAGE FUNCTION CALLED!');
+    console.log('SENDMESSAGE FUNCTION CALLED!');
     console.log('📝 Input message:', inputMessage);
     console.log('📝 Input message length:', inputMessage.length);
     console.log('📝 Input message trimmed:', inputMessage.trim());
@@ -1649,7 +1640,7 @@ export const Scope = ({
       return;
     }
     
-    console.log('🚀 Sending message:', inputMessage);
+    console.log('Sending message:', inputMessage);
     console.log('🤖 Active companion:', attachedCompanion);
     console.log('📝 Current messages:', messages.length);
     
@@ -1700,7 +1691,7 @@ export const Scope = ({
       
       // If there's an active companion attached to a token, use token analysis
       if (attachedCompanion && attachedCompanion.tokenMint) {
-        console.log('🎯 Using token analysis for:', attachedCompanion.name, 'on token:', attachedCompanion.tokenMint);
+        console.log('Using token analysis for:', attachedCompanion.name, 'on token:', attachedCompanion.tokenMint);
         const token = tokens.find(t => t.mint === attachedCompanion.tokenMint);
         if (token) {
           response = await chatService.analyzeToken(token, attachedCompanion.name, inputMessage, selectedAPI, apiKeys);
@@ -1708,7 +1699,7 @@ export const Scope = ({
           response = await chatService.getCompanionResponse(attachedCompanion.name, conversationHistory, inputMessage, selectedAPI, apiKeys);
         }
       } else {
-        console.log('💬 Using general companion response for:', currentCompanion);
+        console.log('Using general companion response for:', currentCompanion);
         // Use general companion response
         response = await chatService.getCompanionResponse(currentCompanion, conversationHistory, inputMessage, selectedAPI, apiKeys);
       }
@@ -1770,7 +1761,7 @@ export const Scope = ({
   const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      console.log('🔥 ENTER KEY PRESSED - Calling sendMessage');
+      console.log('ENTER KEY PRESSED - Calling sendMessage');
       sendMessage();
     }
   }, [sendMessage]);
@@ -1960,7 +1951,7 @@ export const Scope = ({
         ) : !tokens || tokens.length === 0 ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-center text-white/60">
-              <div className="text-2xl mb-4">🔍</div>
+              <div className="text-2xl mb-4">🔎</div>
               <div className="text-xl mb-2">Monitoring Solana for new launches</div>
               <div className="text-sm text-white/40 mt-2">Debug: isLoading={isLoading.toString()}, tokens={tokens?.length || 0}</div>
             </div>
@@ -2490,7 +2481,7 @@ export const Scope = ({
                         {/* Send Button */}
                         <button
                           onClick={() => {
-                            console.log('🔥 SEND BUTTON CLICKED - Calling sendMessage');
+                            console.log('SEND BUTTON CLICKED - Calling sendMessage');
                             sendMessage();
                           }}
                           className={`flex-shrink-0 rounded-full px-4 py-3 h-12 transition-all duration-300 font-medium ${
