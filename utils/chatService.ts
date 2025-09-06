@@ -24,30 +24,57 @@ interface ChatResponse {
 }
 
 class ChatService {
-  private apiKey: string;
-  private baseUrl: string = 'https://api.x.ai/v1/chat/completions';
-
-  constructor() {
-    this.apiKey = process.env.NEXT_PUBLIC_XAI_API_KEY || '';
+  private getApiConfig(provider: string, apiKeys: Record<string, string>) {
+    const configs = {
+      grok4: {
+        baseUrl: 'https://api.x.ai/v1/chat/completions',
+        model: 'grok-4-latest',
+        apiKey: apiKeys.grok4 || process.env.NEXT_PUBLIC_XAI_API_KEY || ''
+      },
+      gpt4: {
+        baseUrl: 'https://api.openai.com/v1/chat/completions',
+        model: 'gpt-4',
+        apiKey: apiKeys.gpt4 || process.env.NEXT_PUBLIC_OPENAI_API_KEY || ''
+      },
+      claude: {
+        baseUrl: 'https://api.anthropic.com/v1/messages',
+        model: 'claude-3-sonnet-20240229',
+        apiKey: apiKeys.claude || process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || ''
+      },
+      gemini: {
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
+        model: 'gemini-pro',
+        apiKey: apiKeys.gemini || process.env.NEXT_PUBLIC_GOOGLE_API_KEY || ''
+      }
+    };
+    
+    return configs[provider as keyof typeof configs] || configs.grok4;
   }
 
   async sendMessage(
     messages: ChatMessage[],
-    model: string = 'grok-4-latest',
+    provider: string = 'grok4',
+    apiKeys: Record<string, string> = {},
     temperature: number = 0.7
   ): Promise<string> {
     try {
-      console.log('🌐 Making API call to X.AI...', { model, temperature, messageCount: messages.length });
+      const config = this.getApiConfig(provider, apiKeys);
       
-      const response = await fetch(this.baseUrl, {
+      if (!config.apiKey) {
+        throw new Error(`No API key found for ${provider}. Please configure your API key in settings.`);
+      }
+      
+      console.log(`🌐 Making API call to ${provider}...`, { model: config.model, temperature, messageCount: messages.length });
+      
+      const response = await fetch(config.baseUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Bearer ${config.apiKey}`,
         },
         body: JSON.stringify({
           messages,
-          model,
+          model: config.model,
           stream: false,
           temperature,
         }),
@@ -79,7 +106,9 @@ class ChatService {
   async analyzeToken(
     tokenData: any,
     companionName: string,
-    userMessage: string
+    userMessage: string,
+    provider: string = 'grok4',
+    apiKeys: Record<string, string> = {}
   ): Promise<string> {
     const systemPrompt = `You are ${companionName}, an expert cryptocurrency analyst and trading companion. You specialize in analyzing Solana tokens and providing insights about their market performance, technical indicators, and trading opportunities.
 
@@ -105,13 +134,15 @@ Provide helpful, accurate, and actionable insights about this token. Be conversa
       }
     ];
 
-    return this.sendMessage(messages, 'grok-4-latest', 0.7);
+    return this.sendMessage(messages, provider, apiKeys, 0.7);
   }
 
   async getCompanionResponse(
     companionName: string,
     conversationHistory: ChatMessage[],
-    userMessage: string
+    userMessage: string,
+    provider: string = 'grok4',
+    apiKeys: Record<string, string> = {}
   ): Promise<string> {
     const systemPrompt = `You are ${companionName}, an expert cryptocurrency analyst and trading companion. You help users analyze tokens, understand market trends, and make informed trading decisions. Be helpful, accurate, and conversational.`;
 
@@ -127,7 +158,7 @@ Provide helpful, accurate, and actionable insights about this token. Be conversa
       }
     ];
 
-    return this.sendMessage(messages, 'grok-4-latest', 0.7);
+    return this.sendMessage(messages, provider, apiKeys, 0.7);
   }
 }
 

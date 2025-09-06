@@ -1355,9 +1355,9 @@ export const Scope = ({
   const [selectedAPI, setSelectedAPI] = useState('grok4');
   const [apiKeys, setApiKeys] = useState({
     grok4: '',
-    gemini: '',
-    perplexity: '',
-    chatgpt: ''
+    gpt4: '',
+    claude: '',
+    gemini: ''
   });
   const [showApiKeyPopup, setShowApiKeyPopup] = useState(false);
   const [editingApiKey, setEditingApiKey] = useState('');
@@ -1408,6 +1408,42 @@ export const Scope = ({
       } catch (error) {
         console.error('Failed to load conversations from localStorage:', error);
       }
+    }
+  }, []);
+
+  // Load API keys and selected API from localStorage
+  useEffect(() => {
+    try {
+      const savedApiKeys = localStorage.getItem('companion_api_keys');
+      const savedSelectedAPI = localStorage.getItem('selected_api');
+      
+      if (savedApiKeys) {
+        const parsedKeys = JSON.parse(savedApiKeys);
+        // Migrate old API key structure to new structure
+        const migratedKeys = {
+          grok4: parsedKeys.grok4 || '',
+          gpt4: parsedKeys.gpt4 || parsedKeys.chatgpt || '',
+          claude: parsedKeys.claude || '',
+          gemini: parsedKeys.gemini || parsedKeys.perplexity || ''
+        };
+        setApiKeys(migratedKeys);
+        
+        // Save migrated keys back to localStorage
+        localStorage.setItem('companion_api_keys', JSON.stringify(migratedKeys));
+      }
+      
+      if (savedSelectedAPI) {
+        // Migrate old API names to new names
+        const migratedAPI = savedSelectedAPI === 'chatgpt' ? 'gpt4' : 
+                           savedSelectedAPI === 'perplexity' ? 'gemini' : 
+                           savedSelectedAPI;
+        setSelectedAPI(migratedAPI);
+        
+        // Save migrated API back to localStorage
+        localStorage.setItem('selected_api', migratedAPI);
+      }
+    } catch (error) {
+      console.error('Failed to load API configuration from localStorage:', error);
     }
   }, []);
 
@@ -1667,14 +1703,14 @@ export const Scope = ({
         console.log('🎯 Using token analysis for:', attachedCompanion.name, 'on token:', attachedCompanion.tokenMint);
         const token = tokens.find(t => t.mint === attachedCompanion.tokenMint);
         if (token) {
-          response = await chatService.analyzeToken(token, attachedCompanion.name, inputMessage);
+          response = await chatService.analyzeToken(token, attachedCompanion.name, inputMessage, selectedAPI, apiKeys);
         } else {
-          response = await chatService.getCompanionResponse(attachedCompanion.name, conversationHistory, inputMessage);
+          response = await chatService.getCompanionResponse(attachedCompanion.name, conversationHistory, inputMessage, selectedAPI, apiKeys);
         }
       } else {
         console.log('💬 Using general companion response for:', currentCompanion);
         // Use general companion response
-        response = await chatService.getCompanionResponse(currentCompanion, conversationHistory, inputMessage);
+        response = await chatService.getCompanionResponse(currentCompanion, conversationHistory, inputMessage, selectedAPI, apiKeys);
       }
       
       console.log('✅ Received response:', response);
@@ -1742,12 +1778,9 @@ export const Scope = ({
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setInputMessage(e.target.value);
     
-    // Auto-close settings menu when user starts typing
-    if (isSettingsOpen) {
-      setIsSettingsOpen(false);
-      setSettingsView('menu');
-    }
-  }, [isSettingsOpen]);
+    // Removed auto-close behavior that was causing the settings panel to disappear
+    // when clicking buttons inside the settings panel
+  }, []);
 
   // Auto-scroll to bottom when new messages arrive
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -2388,18 +2421,23 @@ export const Scope = ({
                   </div>
                   
                   {/* Chat input row at bottom - fixed with proper spacing */}
-                  <div className="shrink-0 border-t border-neutral-800/60 bg-black/95">
+                  <div className="shrink-0 border-t border-neutral-800/60 relative">
                     <div className="w-full p-4 pt-3 flex justify-center items-center h-20 chat-input-container">
                       <div className="w-full max-w-4xl flex items-center gap-3">
                         {/* Settings Button */}
                         <button
                           onClick={() => {
+                            console.log('Settings button clicked, current state:', isSettingsOpen);
                             setIsSettingsOpen(!isSettingsOpen);
                             if (!isSettingsOpen) {
                               setSettingsView('menu');
                             }
                           }}
-                          className="flex-shrink-0 text-gray-300 hover:text-white rounded-full p-3 h-12 w-12 transition-all duration-300"
+                          className={`flex-shrink-0 rounded-full h-12 w-12 transition-all duration-300 flex items-center justify-center ${
+                            isSettingsOpen 
+                              ? 'text-white bg-white/10 border border-white/20' 
+                              : 'text-gray-300 hover:text-white hover:bg-white/5'
+                          }`}
                           title="Settings & History"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2440,6 +2478,262 @@ export const Scope = ({
                         </button>
                       </div>
                     </div>
+                    
+                    {/* Settings Panel - Anchored to chat input container */}
+                    {isSettingsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="absolute bottom-20 right-4 w-72 max-w-[calc(100%-2rem)] bg-black/95 border border-white/10 rounded-xl p-4 z-[70] max-h-[calc(100vh-200px)] overflow-y-auto shadow-2xl shadow-black/50 backdrop-blur-sm"
+                        style={{
+                          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+                        }}
+                      >
+                        {/* Main Menu View */}
+                        {settingsView === 'menu' && (
+                          <div>
+                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+                              <h3 className="text-white text-lg font-semibold">Settings</h3>
+                              <button
+                                onClick={() => setIsSettingsOpen(false)}
+                                className="text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <button
+                                onClick={() => {
+                                  setMessages([]);
+                                  setInputMessage('');
+                                  setCurrentConversationId(null);
+                                  setIsSettingsOpen(false);
+                                }}
+                                className="w-full p-4 bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/10 transition-all duration-200 text-left rounded-lg"
+                              >
+                                <div className="text-white text-lg font-medium">New Chat</div>
+                                <div className="text-gray-400 text-sm mt-1">Start a fresh conversation</div>
+                              </button>
+                              
+                              <button
+                                onClick={() => {
+                                  console.log('Companion API button clicked');
+                                  setSettingsView('api');
+                                }}
+                                className="w-full p-4 bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/10 transition-all duration-200 text-left rounded-lg"
+                              >
+                                <div className="text-white text-lg font-medium">Companion API</div>
+                                <div className="text-gray-400 text-sm mt-1">Configure AI providers and API keys</div>
+                              </button>
+                              
+                              <button
+                                onClick={() => {
+                                  console.log('History button clicked');
+                                  setSettingsView('history');
+                                }}
+                                className="w-full p-4 bg-white/5 border border-white/10 hover:border-white/20 hover:bg-white/10 transition-all duration-200 text-left rounded-lg"
+                              >
+                                <div className="text-white text-lg font-medium">History</div>
+                                <div className="text-gray-400 text-sm mt-1">View and restore past conversations</div>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Companion API View */}
+                        {settingsView === 'api' && (
+                          <div>
+                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+                              <div className="flex items-center space-x-3">
+                                <button
+                                  onClick={() => setSettingsView('menu')}
+                                  className="text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                </button>
+                                <h3 className="text-white text-lg font-semibold">Companion API</h3>
+                              </div>
+                              <button
+                                onClick={() => setIsSettingsOpen(false)}
+                                className="text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                            
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-white text-sm font-medium mb-2">AI Provider</label>
+                                <select
+                                  value={selectedAPI}
+                                  onChange={(e) => setSelectedAPI(e.target.value)}
+                                  className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-white/20 focus:outline-none"
+                                >
+                                  <option value="grok4">Grok-4 (X.AI)</option>
+                                  <option value="gpt4">GPT-4 (OpenAI)</option>
+                                  <option value="claude">Claude (Anthropic)</option>
+                                  <option value="gemini">Gemini (Google)</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-white text-sm font-medium mb-2">API Key</label>
+                                <div className="flex space-x-2">
+                                  <input
+                                    type="password"
+                                    value={apiKeys[selectedAPI as keyof typeof apiKeys] || ''}
+                                    onChange={(e) => setApiKeys(prev => ({ ...prev, [selectedAPI]: e.target.value }))}
+                                    placeholder={`Enter your ${selectedAPI.toUpperCase()} API key`}
+                                    className="flex-1 p-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:border-white/20 focus:outline-none"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      const key = apiKeys[selectedAPI as keyof typeof apiKeys];
+                                      if (key) {
+                                        navigator.clipboard.writeText(key);
+                                        // You could add a toast notification here
+                                      }
+                                    }}
+                                    className="px-3 py-3 bg-white/10 border border-white/10 rounded-lg text-white hover:bg-white/20 transition-colors"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                                <div className="flex items-start space-x-3">
+                                  <svg className="w-5 h-5 text-blue-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <div>
+                                    <h4 className="text-blue-400 font-medium mb-1">API Key Security</h4>
+                                    <p className="text-gray-300 text-sm">
+                                      Your API keys are stored locally in your browser and never sent to our servers. 
+                                      Make sure to keep your keys secure and never share them publicly.
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => {
+                                  // Save API keys to localStorage
+                                  localStorage.setItem('companion_api_keys', JSON.stringify(apiKeys));
+                                  localStorage.setItem('selected_api', selectedAPI);
+                                  setIsSettingsOpen(false);
+                                }}
+                                className="w-full p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                              >
+                                Save Configuration
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* History View */}
+                        {settingsView === 'history' && (
+                          <div>
+                            <div className="flex justify-between items-center mb-4 pb-3 border-b border-white/10">
+                              <div className="flex items-center space-x-3">
+                                <button
+                                  onClick={() => setSettingsView('menu')}
+                                  className="text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                </button>
+                                <h3 className="text-white text-lg font-semibold">Conversation History</h3>
+                              </div>
+                              <button
+                                onClick={() => setIsSettingsOpen(false)}
+                                className="text-gray-400 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                            
+                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                              {conversationHistory.length === 0 ? (
+                                <div className="text-center py-8">
+                                  <svg className="w-12 h-12 text-gray-500 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                  </svg>
+                                  <p className="text-gray-400">No conversation history yet</p>
+                                  <p className="text-gray-500 text-sm mt-1">Start chatting to see your conversations here</p>
+                                </div>
+                              ) : (
+                                conversationHistory.map((conversation) => (
+                                  <div
+                                    key={conversation.id}
+                                    className="p-4 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                                    onClick={() => {
+                                      setMessages(conversation.messages);
+                                      setCurrentConversationId(conversation.id);
+                                      setIsSettingsOpen(false);
+                                    }}
+                                  >
+                                    <div className="flex justify-between items-start">
+                                      <div className="flex-1 min-w-0">
+                                        <h4 className="text-white font-medium truncate">{conversation.title}</h4>
+                                        <p className="text-gray-400 text-sm mt-1">
+                                          {conversation.messages.length} messages
+                                        </p>
+                                        <p className="text-gray-500 text-xs mt-1">
+                                          {conversation.timestamp.toLocaleDateString()} at {conversation.timestamp.toLocaleTimeString()}
+                                        </p>
+                                      </div>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setConversationHistory(prev => prev.filter(conv => conv.id !== conversation.id));
+                                          localStorage.setItem('scope_conversations', JSON.stringify(
+                                            conversationHistory.filter(conv => conv.id !== conversation.id)
+                                          ));
+                                        }}
+                                        className="text-gray-500 hover:text-red-400 transition-colors p-1 rounded-full hover:bg-red-500/10"
+                                      >
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+
+                            {conversationHistory.length > 0 && (
+                              <div className="mt-4 pt-4 border-t border-white/10">
+                                <button
+                                  onClick={() => {
+                                    setConversationHistory([]);
+                                    localStorage.removeItem('scope_conversations');
+                                  }}
+                                  className="w-full p-3 bg-red-600/20 border border-red-600/30 text-red-400 rounded-lg font-medium hover:bg-red-600/30 transition-colors"
+                                >
+                                  Clear All History
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2447,284 +2741,36 @@ export const Scope = ({
           </div>
         )}
         
-        {/* API Key Popup */}
-        {showApiKeyPopup && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100]"
-            onClick={() => setShowApiKeyPopup(false)}
-          >
-            <motion.div
-              className="bg-gray-900 border border-gray-600 rounded-lg p-6 w-96 max-w-[90vw]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-white text-lg font-semibold capitalize">
-                  Configure {editingApiKey} API
-                </h3>
-                <button
-                  onClick={() => setShowApiKeyPopup(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="mb-4">
-                <label className="text-gray-300 text-sm mb-2 block">API Key</label>
-                <input
-                  type="password"
-                  value={apiKeys[editingApiKey as keyof typeof apiKeys]}
-                  onChange={(e) => setApiKeys(prev => ({ ...prev, [editingApiKey]: e.target.value }))}
-                  placeholder={`Enter your ${editingApiKey} API key`}
-                  className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowApiKeyPopup(false)}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white rounded px-4 py-2 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedAPI(editingApiKey);
-                    setShowApiKeyPopup(false);
-                  }}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-2 transition-colors"
-                >
-                  Save & Select
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-        
-        {/* Settings Panel */}
-        {isSettingsOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute bottom-24 right-4 w-80 bg-black/90 border border-gray-700 rounded-lg p-4 z-[70] max-h-[calc(100vh-220px)] overflow-y-auto"
-          >
-            {/* Main Menu View */}
-            {settingsView === 'menu' && (
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-white text-lg font-semibold">Settings</h3>
-                  <button
-                    onClick={() => setIsSettingsOpen(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                
-                <div className="space-y-3">
-                  <button
-                    onClick={() => {
-                      setMessages([]);
-                      setInputMessage('');
-                      setCurrentConversationId(null);
-                      setIsSettingsOpen(false);
-                    }}
-                    className="w-full p-4 bg-blue-600/20 border border-blue-500/30 hover:border-blue-400/50 transition-colors text-left"
-                  >
-                    <div className="text-white text-lg font-medium">New Chat</div>
-                    <div className="text-blue-300 text-sm mt-1">Start a fresh conversation</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setSettingsView('api')}
-                    className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors text-left"
-                  >
-                    <div className="text-white text-lg font-medium">Companion API</div>
-                    <div className="text-gray-400 text-sm mt-1">Configure AI providers and API keys</div>
-                  </button>
-                  
-                  <button
-                    onClick={() => setSettingsView('history')}
-                    className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors text-left"
-                  >
-                    <div className="text-white text-lg font-medium">History</div>
-                    <div className="text-gray-400 text-sm mt-1">View and restore past conversations</div>
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* API Configuration View */}
-            {settingsView === 'api' && (
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setSettingsView('menu')}
-                      className="text-gray-400 hover:text-white transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <h3 className="text-white text-lg font-semibold">Companion API</h3>
-                  </div>
-                  <button
-                    onClick={() => setIsSettingsOpen(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { key: 'grok4', name: 'Grok 4', default: true },
-                    { key: 'gemini', name: 'Gemini', default: false },
-                    { key: 'perplexity', name: 'Perplexity', default: false },
-                    { key: 'chatgpt', name: 'ChatGPT', default: false }
-                  ].map((api) => (
-                    <button
-                      key={api.key}
-                      onClick={() => {
-                        if (api.key === 'grok4') {
-                          setSelectedAPI(api.key);
-                        } else {
-                          setEditingApiKey(api.key);
-                          setShowApiKeyPopup(true);
-                        }
-                      }}
-                      className={`p-3 rounded-lg border transition-all duration-200 ${
-                        selectedAPI === api.key
-                          ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-                          : 'border-gray-600 bg-gray-800/50 text-gray-300 hover:border-gray-500'
-                      }`}
-                    >
-                      <div className="text-sm font-medium">{api.name}</div>
-                      {api.default && (
-                        <div className="text-xs text-gray-400 mt-1">Default</div>
-                      )}
-                      {!api.default && (
-                        <div className="text-xs text-gray-400 mt-1">Click to configure</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* History View */}
-            {settingsView === 'history' && (
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setSettingsView('menu')}
-                      className="text-gray-400 hover:text-white transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <h3 className="text-white text-lg font-semibold">Conversation History</h3>
-                  </div>
-                  <button
-                    onClick={() => setIsSettingsOpen(false)}
-                    className="text-gray-400 hover:text-white transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {conversationHistory.length === 0 ? (
-                    <div className="text-gray-400 text-sm text-center py-8">
-                      No conversations yet
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-gray-400 text-xs">
-                          {conversationHistory.length} conversations
-                        </span>
-                        <button
-                          onClick={() => {
-                            if (confirm('Clear all conversation history?')) {
-                              setConversationHistory([]);
-                              localStorage.removeItem('scope_conversations');
-                              setIsSettingsOpen(false);
-                            }
-                          }}
-                          className="text-red-400 hover:text-red-300 text-xs transition-colors"
-                        >
-                          Clear All
-                        </button>
-                      </div>
-                      {conversationHistory.map((conv) => (
-                        <button
-                          key={conv.id}
-                          onClick={() => {
-                            setMessages(conv.messages);
-                            setIsSettingsOpen(false);
-                          }}
-                          className="w-full text-left p-3 bg-gray-800/50 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors"
-                        >
-                          <div className="text-white text-sm font-medium truncate">{conv.title}</div>
-                          <div className="text-gray-400 text-xs mt-1">
-                            {conv.timestamp.toLocaleDateString()} - {conv.messages.length} messages
-                          </div>
-                        </button>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
+        {/* Help Popup */}
+        <HelpPopup isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       </motion.div>
-      
-      {/* Help Popup */}
-      <HelpPopup isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </motion.div>
-  );
+    );
 };
 
 // Wrapped Scope component with WatchlistProvider
 const ScopeWithWatchlist: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  tokens: any[];
-  isLoading: boolean;
-  lastUpdate: Date | null;
-  stats: any;
-  connectionStatus: string;
-  live: boolean;
-  resumeLive: () => void;
-  pauseLive: () => void;
-  pauseLiveOnHover: () => void;
-  resumeLiveAfterHover: () => void;
-  isHoverPaused: boolean;
-  queuedTokens: any[];
-  newTokenMint: string | null;
-}> = (props) => {
-  return (
-    <WatchlistProvider>
-      <Scope {...props} />
-    </WatchlistProvider>
-  );
-};
-
-export default ScopeWithWatchlist;
+    isOpen: boolean;
+    onClose: () => void;
+    tokens: any[];
+    isLoading: boolean;
+    lastUpdate: Date | null;
+    stats: any;
+    connectionStatus: string;
+    live: boolean;
+    resumeLive: () => void;
+    pauseLive: () => void;
+    pauseLiveOnHover: () => void;
+    resumeLiveAfterHover: () => void;
+    isHoverPaused: boolean;
+    queuedTokens: any[];
+    newTokenMint: string | null;
+  }> = (props) => {
+    return (
+      <WatchlistProvider>
+        <Scope {...props} />
+      </WatchlistProvider>
+    );
+  };
+  
+  export default ScopeWithWatchlist;
