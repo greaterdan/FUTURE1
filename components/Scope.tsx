@@ -1821,6 +1821,26 @@ export const Scope = ({
     }
   }, [isOpen, onClose]);
 
+  // Add click outside functionality to close settings panel
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (isSettingsOpen) {
+        const target = event.target as Element;
+        const settingsPanel = document.querySelector('[data-settings-panel]');
+        
+        if (settingsPanel && !settingsPanel.contains(target)) {
+          setIsSettingsOpen(false);
+          setSettingsView('menu');
+        }
+      }
+    };
+
+    if (isSettingsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isSettingsOpen]);
+
   // Early return after all hooks have been called
   if (!isOpen) {
     return null;
@@ -2233,6 +2253,14 @@ export const Scope = ({
                           // Clear drag target immediately - no need for delay
                           setDragTargetToken(null);
                         }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Close settings panel when clicking on companion logo
+                          if (isSettingsOpen) {
+                            setIsSettingsOpen(false);
+                            setSettingsView('menu');
+                          }
+                        }}
                       >
                         {agent.videoFile.endsWith('.gif') ? (
                           <img 
@@ -2482,6 +2510,7 @@ export const Scope = ({
                     {/* Settings Panel - Anchored to chat input container */}
                     {isSettingsOpen && (
                       <motion.div
+                        data-settings-panel
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -2578,10 +2607,10 @@ export const Scope = ({
                                   onChange={(e) => setSelectedAPI(e.target.value)}
                                   className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white focus:border-white/20 focus:outline-none"
                                 >
-                                  <option value="grok4">Grok-4 (X.AI)</option>
-                                  <option value="gpt4">GPT-4 (OpenAI)</option>
-                                  <option value="claude">Claude (Anthropic)</option>
-                                  <option value="gemini">Gemini (Google)</option>
+                                  <option value="grok4">Grok-4 (X.AI) - Requires API Key</option>
+                                  <option value="gpt4">GPT-4 (OpenAI) - Requires API Key</option>
+                                  <option value="claude">Claude (Anthropic) - Requires API Key</option>
+                                  <option value="gemini">Gemini (Google) - Requires API Key</option>
                                 </select>
                               </div>
 

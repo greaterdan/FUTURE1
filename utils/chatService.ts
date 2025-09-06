@@ -29,22 +29,26 @@ class ChatService {
       grok4: {
         baseUrl: 'https://api.x.ai/v1/chat/completions',
         model: 'grok-4-latest',
-        apiKey: apiKeys.grok4 || process.env.NEXT_PUBLIC_XAI_API_KEY || ''
+        // Use environment variable for API key
+        apiKey: process.env.NEXT_PUBLIC_XAI_API_KEY || ''
       },
       gpt4: {
         baseUrl: 'https://api.openai.com/v1/chat/completions',
         model: 'gpt-4',
-        apiKey: apiKeys.gpt4 || process.env.NEXT_PUBLIC_OPENAI_API_KEY || ''
+        // Users must provide their own OpenAI API key
+        apiKey: apiKeys.gpt4 || ''
       },
       claude: {
         baseUrl: 'https://api.anthropic.com/v1/messages',
         model: 'claude-3-sonnet-20240229',
-        apiKey: apiKeys.claude || process.env.NEXT_PUBLIC_ANTHROPIC_API_KEY || ''
+        // Users must provide their own Claude API key
+        apiKey: apiKeys.claude || ''
       },
       gemini: {
         baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
         model: 'gemini-pro',
-        apiKey: apiKeys.gemini || process.env.NEXT_PUBLIC_GOOGLE_API_KEY || ''
+        // Users must provide their own Gemini API key
+        apiKey: apiKeys.gemini || ''
       }
     };
     
@@ -61,23 +65,61 @@ class ChatService {
       const config = this.getApiConfig(provider, apiKeys);
       
       if (!config.apiKey) {
-        throw new Error(`No API key found for ${provider}. Please configure your API key in settings.`);
+        if (provider === 'grok4') {
+          throw new Error('Grok API key not available. Please contact support.');
+        } else {
+          throw new Error(`No API key found for ${provider}. Please configure your API key in settings.`);
+        }
       }
       
       console.log(`🌐 Making API call to ${provider}...`, { model: config.model, temperature, messageCount: messages.length });
       
-      const response = await fetch(config.baseUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify({
+      let requestBody: any;
+      let headers: any = {
+        'Content-Type': 'application/json',
+      };
+
+      // Handle different API formats
+      if (provider === 'claude') {
+        headers['x-api-key'] = config.apiKey;
+        headers['anthropic-version'] = '2023-06-01';
+        requestBody = {
+          model: config.model,
+          max_tokens: 1000,
+          temperature,
+          messages: messages.map(msg => ({
+            role: msg.role === 'assistant' ? 'assistant' : msg.role,
+            content: msg.content
+          }))
+        };
+      } else if (provider === 'gemini') {
+        headers['x-goog-api-key'] = config.apiKey;
+        requestBody = {
+          contents: [{
+            parts: [{
+              text: messages.map(msg => `${msg.role}: ${msg.content}`).join('\n')
+            }]
+          }],
+          generationConfig: {
+            temperature,
+            maxOutputTokens: 1000
+          }
+        };
+      } else {
+        // Grok and OpenAI use the same format
+        headers['Authorization'] = `Bearer ${config.apiKey}`;
+        requestBody = {
           messages,
           model: config.model,
           stream: false,
           temperature,
-        }),
+        };
+      }
+      
+      const response = await fetch(config.baseUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -86,17 +128,36 @@ class ChatService {
         throw new Error(`Chat API error: ${response.status} ${response.statusText} - ${errorText}`);
       }
 
-      const data: ChatResponse = await response.json();
+      const data: any = await response.json();
       console.log('📥 API Response:', data);
       
-      if (data.choices && data.choices.length > 0) {
-        const content = data.choices[0].message.content;
-        console.log('💬 Response content:', content);
-        return content;
+      let content: string;
+      
+      // Handle different API response formats
+      if (provider === 'claude') {
+        if (data.content && data.content.length > 0) {
+          content = data.content[0].text;
+        } else {
+          throw new Error('No content in Claude response');
+        }
+      } else if (provider === 'gemini') {
+        if (data.candidates && data.candidates.length > 0 && data.candidates[0].content) {
+          content = data.candidates[0].content.parts[0].text;
+        } else {
+          throw new Error('No content in Gemini response');
+        }
       } else {
-        console.error('❌ No choices in response:', data);
-        throw new Error('No response from chat API');
+        // Grok and OpenAI use the same format
+        if (data.choices && data.choices.length > 0) {
+          content = data.choices[0].message.content;
+        } else {
+          console.error('❌ No choices in response:', data);
+          throw new Error('No response from chat API');
+        }
       }
+      
+      console.log('💬 Response content:', content);
+      return content;
     } catch (error) {
       console.error('❌ Chat service error:', error);
       throw error;
